@@ -22,7 +22,7 @@ internal class Chiuaua {
     private delegate bool SetConsoleCtrlEventHandler(ConsoleCtrlType sig);
 
     private static string Usage() =>
-        "\n\nNo frills UEVR injector. Chiuaua does what bigger dogs won't."
+        "\n\nNo frills UEVR injector. Chiuaua goes where bigger dogs won't."
         + "\n\nUsage: "
         + Process.GetCurrentProcess().ProcessName
         + " --gameExe=game.exe --delay=20"
