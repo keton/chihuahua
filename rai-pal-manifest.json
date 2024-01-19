@@ -1,0 +1,11 @@
+{
+  "version": "1.03",
+  "runnable": {
+    "path": "chiuaua.exe",
+    "args": [
+      "--gameExe={{ExecutablePath}}", "--delay=20", "--launchCmd={{StartCommand}}", "--launchCmdArgs={{StartCommandArgs}}"
+    ]
+  },
+  "engine": "Unreal",
+  "unityBackend": null
+}
