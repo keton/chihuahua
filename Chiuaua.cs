@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-internal class Program {
+internal class Chiuaua {
     private enum ConsoleCtrlType {
         CTRL_C_EVENT = 0,
         CTRL_BREAK_EVENT = 1,
