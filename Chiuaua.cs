@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using NLog;
+using NLog.Targets;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 internal class Chiuaua {
@@ -10,6 +12,8 @@ internal class Chiuaua {
         CTRL_SHUTDOWN_EVENT = 6
     }
 
+    private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
     // https://learn.microsoft.com/en-us/windows/console/setconsolectrlhandler?WT.mc_id=DT-MVP-5003978
     [DllImport("Kernel32")]
     private static extern bool SetConsoleCtrlHandler(SetConsoleCtrlEventHandler handler, bool add);
@@ -18,7 +22,7 @@ internal class Chiuaua {
     private delegate bool SetConsoleCtrlEventHandler(ConsoleCtrlType sig);
 
     private static string Usage() =>
-        "No frills UEVR injector. Chiuaua does what bigger dogs won't."
+        "\n\nNo frills UEVR injector. Chiuaua does what bigger dogs won't."
         + "\n\nUsage: "
         + Process.GetCurrentProcess().ProcessName
         + " --gameExe=game.exe --delay=20"
@@ -69,7 +73,7 @@ internal class Chiuaua {
 
     private static void ParseArgs(string[] args) {
         if (args.Length < 2) {
-            Helpers.ExitWithMessage(Usage(), 1);
+            Helpers.ExitWithMessage(Usage(), 0);
         }
 
         foreach (var arg in args) {
@@ -89,18 +93,18 @@ internal class Chiuaua {
                 try {
                     injectionDelay = int.Parse(arg.Substring(arg.IndexOf("=") + 1)) * 1000;
                 } catch (Exception) {
-                    Helpers.ExitWithMessage("error parsing --delay=, " + arg.Split("=")[1] + " is not a valid int", 1);
+                    Helpers.ExitWithMessage("error parsing --delay=, " + arg.Split("=")[1] + " is not a valid int");
                 }
                 continue;
             }
         }
 
         if (gameExe.Length == 0) {
-            Helpers.ExitWithMessage("You must specify game executable using --gameExe", 1);
+            Helpers.ExitWithMessage("You must specify game executable using --gameExe");
         }
 
         if (!Path.Exists(gameExe)) {
-            Helpers.ExitWithMessage(gameExe + " not found.", 1);
+            Helpers.ExitWithMessage(gameExe + " not found.");
         }
 
         if (launchCmd.Length == 0) {
@@ -108,17 +112,36 @@ internal class Chiuaua {
         }
 
         if (injectionDelay <= 0) {
-            Helpers.ExitWithMessage("--delay= argument must be greater than 0", 1);
+            Helpers.ExitWithMessage("--delay= argument must be greater than 0");
         }
     }
 
+    private static void SetupLogger() {
+        LogManager.Setup().LoadConfiguration(builder => {
+
+            var coloredConsole = new ColoredConsoleTarget() {
+                Layout = "${time}|${pad:padding=5:inner=${level:uppercase=true}}|${logger}|${message:withexception=true}",
+                RowHighlightingRules = {
+                    new ConsoleRowHighlightingRule("level == LogLevel.Debug", ConsoleOutputColor.DarkGray, ConsoleOutputColor.NoChange),
+                    new ConsoleRowHighlightingRule("level == LogLevel.Info", ConsoleOutputColor.White, ConsoleOutputColor.NoChange),
+                    new ConsoleRowHighlightingRule("level == LogLevel.Warn", ConsoleOutputColor.Yellow, ConsoleOutputColor.NoChange),
+                    new ConsoleRowHighlightingRule("level == LogLevel.Error", ConsoleOutputColor.Red, ConsoleOutputColor.NoChange),
+                    new ConsoleRowHighlightingRule("level == LogLevel.Fatal", ConsoleOutputColor.Magenta, ConsoleOutputColor.NoChange),
+                }
+            };
+
+            builder.ForLogger().FilterMinLevel(LogLevel.Info).WriteTo(coloredConsole);
+        });
+    }
+
     private static async Task Main(string[] args) {
+        SetupLogger();
 
         ParseArgs(args);
 
         var exePath = Path.GetDirectoryName(Environment.ProcessPath);
         if (!Helpers.CheckDLLsPresent(exePath ?? "")) {
-            Console.WriteLine("Attempting to download missing files...");
+            Logger.Info("Attempting to download missing files...");
             await Helpers.DownloadUEVRAsync();
         }
 
@@ -130,28 +153,28 @@ internal class Chiuaua {
             Arguments = launchCmdArgs
         });
 
-        Console.WriteLine("Waiting for {0} to spawn", Path.GetFileName(gameExe));
+        Logger.Info("Waiting for {0} to spawn", Path.GetFileName(gameExe));
 
         if (await Helpers.WaitForGameProcessAsync(gameExe, 30 * 1000)) {
-            Console.WriteLine("Game process found");
+            Logger.Debug("Game process found");
         } else {
-            Helpers.ExitWithMessage("Timed out while waiting for game process", 1);
+            Helpers.ExitWithMessage("Timed out while waiting for game process");
         }
 
-        Console.WriteLine("Waiting {0}s before injection.", injectionDelay / 1000.0);
+        Logger.Info("Waiting {0}s before injection.", injectionDelay / 1000.0);
 
         await Task.Delay(injectionDelay);
 
         var mainGameProcess = Helpers.GetMainGameProces(gameExe);
         if (mainGameProcess == null) {
-            Helpers.ExitWithMessage(Path.GetFileName(gameExe) + " exited before it could be injected.", 1);
+            Helpers.ExitWithMessage(Path.GetFileName(gameExe) + " exited before it could be injected.");
         }
 
         Helpers.NullifyPlugins(mainGameProcess.Id);
         Helpers.InjectDll(mainGameProcess.Id, "openxr_loader.dll");
         Helpers.InjectDll(mainGameProcess.Id, "UEVRBackend.dll");
 
-        Console.WriteLine("Injection done, close this window to kill game process.");
+        Logger.Info("Injection done, close this window to kill game process.");
 
         SetConsoleCtrlHandler(ConsoleCloseHandler, true);
 
@@ -159,13 +182,14 @@ internal class Chiuaua {
             await Task.Delay(100);
         }
 
-        Console.WriteLine("Game has exitted.");
+        Logger.Info("Game has exitted.");
 
         if (Helpers.GetGameProceses(gameExe).Length > 0) {
-            Console.WriteLine("Leftover game process detected. Terminating...");
+            Logger.Debug("Leftover game process detected. Terminating...");
             Helpers.TryCloseGame(gameExe);
         }
 
+        NLog.LogManager.Shutdown();
         Environment.Exit(0);
     }
 }

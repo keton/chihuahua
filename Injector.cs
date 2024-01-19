@@ -13,6 +13,9 @@ namespace chiuaua {
      * 
      */
     internal class Injector {
+
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         [DllImport("kernel32.dll")]
         public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
@@ -53,7 +56,7 @@ namespace chiuaua {
             }
 
             if (!File.Exists(dllPath)) {
-                Console.WriteLine($"{originalPath} does not appear to exist! Check if any anti-virus software has deleted the file. Reinstall UEVR if necessary.\n\nBaseDirectory: {AppContext.BaseDirectory}");
+                Logger.Error($"{originalPath} does not appear to exist! Check if any anti-virus software has deleted the file. Reinstall UEVR if necessary.");
             }
 
             dllBase = IntPtr.Zero;
@@ -64,7 +67,7 @@ namespace chiuaua {
             IntPtr processHandle = OpenProcess(0x1F0FFF, false, processId);
 
             if (processHandle == IntPtr.Zero) {
-                Console.WriteLine("Could not open a handle to the target process.\nYou may need to start this program as an administrator, or the process may be protected.");
+                Logger.Error("Could not open a handle to the target process.\nYou may need to start this program as an administrator, or the process may be protected.");
                 return false;
             }
 
@@ -72,7 +75,7 @@ namespace chiuaua {
             IntPtr loadLibraryAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryW");
 
             if (loadLibraryAddress == IntPtr.Zero) {
-                Console.WriteLine("Could not obtain LoadLibraryW address in the target process.");
+                Logger.Error("Could not obtain LoadLibraryW address in the target process.");
                 return false;
             }
 
@@ -80,7 +83,7 @@ namespace chiuaua {
             IntPtr dllPathAddress = VirtualAllocEx(processHandle, IntPtr.Zero, (uint)fullPath.Length, 0x1000, 0x40);
 
             if (dllPathAddress == IntPtr.Zero) {
-                Console.WriteLine("Failed to allocate memory in the target process.");
+                Logger.Error("Failed to allocate memory in the target process.");
                 return false;
             }
 
@@ -93,7 +96,7 @@ namespace chiuaua {
             IntPtr threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, loadLibraryAddress, dllPathAddress, 0, IntPtr.Zero);
 
             if (threadHandle == IntPtr.Zero) {
-                Console.WriteLine("Failed to create remote thread in the target processs.");
+                Logger.Error("Failed to create remote thread in the target processs.");
                 return false;
             }
 
@@ -110,7 +113,7 @@ namespace chiuaua {
                         }
                     }
                 } catch (Exception ex) {
-                    Console.WriteLine($"Exception caught: {ex}");
+                    Logger.Error(ex);
                 }
 
             return true;
@@ -132,7 +135,7 @@ namespace chiuaua {
             IntPtr processHandle = OpenProcess(0x1F0FFF, false, processId);
 
             if (processHandle == IntPtr.Zero) {
-                Console.WriteLine("Could not open a handle to the target process.\nYou may need to start this program as an administrator, or the process may be protected.");
+                Logger.Error("Could not open a handle to the target process. You may need to start this program as an administrator, or the process may be protected.");
                 return false;
             }
 
@@ -140,14 +143,14 @@ namespace chiuaua {
             IntPtr localDllHandle = LoadLibrary(dllPath);
 
             if (localDllHandle == IntPtr.Zero) {
-                Console.WriteLine("Could not load the target DLL into our own process.");
+                Logger.Error("Could not load the target DLL into our own process.");
                 return false;
             }
 
             IntPtr localVa = GetProcAddress(localDllHandle, functionName);
 
             if (localVa == IntPtr.Zero) {
-                Console.WriteLine("Could not obtain " + functionName + " address in our own process.");
+                Logger.Error("Could not obtain " + functionName + " address in our own process.");
                 return false;
             }
 
@@ -158,7 +161,7 @@ namespace chiuaua {
             IntPtr threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, functionAddress, IntPtr.Zero, 0, IntPtr.Zero);
 
             if (threadHandle == IntPtr.Zero) {
-                Console.WriteLine("Failed to create remote thread in the target processs.");
+                Logger.Error("Failed to create remote thread in the target processs.");
                 return false;
             }
 

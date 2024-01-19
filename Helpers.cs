@@ -5,6 +5,8 @@ using System.IO.Compression;
 
 internal static class Helpers {
 
+    private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
     private static readonly string uevrDownloadURL = "https://github.com/praydog/UEVR/releases/latest/download/UEVR.zip";
 
     private static readonly string[] uevr_dlls = [
@@ -46,17 +48,22 @@ internal static class Helpers {
             }
 
         } catch (Exception e) {
-            ExitWithMessage("Error downloading: " + e.Message, 1);
+            ExitWithMessage("Error downloading: " + e.Message);
         }
     }
 
     [DoesNotReturn]
-    public static void ExitWithMessage(string message, int exitCode = 0) {
-        Console.WriteLine(message);
+    public static void ExitWithMessage(string message, int exitCode = 1) {
+        if (exitCode == 0) {
+            Logger.Info(message);
+        } else {
+            Logger.Fatal(message);
+        }
 
-        Console.WriteLine("Press any key to continue...");
+        Console.WriteLine("\nPress any key to continue...");
         Console.ReadKey();
 
+        NLog.LogManager.Shutdown();
         Environment.Exit(exitCode);
     }
 
@@ -113,7 +120,7 @@ internal static class Helpers {
 
     public static void InjectDll(int processId, string dllName) {
         if (!Injector.InjectDll(processId, dllName)) {
-            ExitWithMessage("Failed to inject: " + dllName, 1);
+            ExitWithMessage("Failed to inject: " + dllName);
         }
     }
 
@@ -131,10 +138,10 @@ internal static class Helpers {
         IntPtr nullifierBase;
         if (Injector.InjectDll(processId, "UEVRPluginNullifier.dll", out nullifierBase) && nullifierBase.ToInt64() > 0) {
             if (!Injector.CallFunctionNoArgs(processId, "UEVRPluginNullifier.dll", nullifierBase, "nullify", true)) {
-                Console.WriteLine("Failed to nullify VR plugins.");
+                Logger.Warn("Failed to nullify VR plugins.");
             }
         } else {
-            ExitWithMessage("Failed to inject: UEVRPluginNullifier.dll", 1);
+            ExitWithMessage("Failed to inject: UEVRPluginNullifier.dll");
         }
     }
 
@@ -147,9 +154,9 @@ internal static class Helpers {
             if (Directory.Exists(pluginDir)) {
                 try {
                     Directory.Delete(pluginDir, true);
-                    Console.WriteLine("Removed plugin: " + pluginDir);
+                    Logger.Debug("Removed plugin: " + pluginDir);
                 } catch (Exception e) {
-                    Console.WriteLine("Failed to remove plugin " + pluginDir + "\nException: " + e.Message);
+                    Logger.Warn("Failed to remove plugin " + pluginDir + "\nException: " + e.Message);
                 }
             }
         }
