@@ -171,12 +171,12 @@ internal static class Helpers {
         }
     }
 
-    public static async Task<bool> WaitForGameProcessAsync(string gameExe, int timeoutMs) {
+    public static async Task<bool> WaitForGameProcessAsync(string gameExe, int timeoutS) {
         int elapsed = 0;
 
         Process? gameProcess = null;
 
-        while ((elapsed < timeoutMs) && (gameProcess = GetMainGameProces(gameExe)) == null) {
+        while ((elapsed < timeoutS * 1000) && (gameProcess = GetMainGameProces(gameExe)) == null) {
             elapsed += 100;
             await Task.Delay(100);
         }

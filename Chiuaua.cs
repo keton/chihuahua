@@ -2,6 +2,13 @@
 using NLog.Targets;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
+using System.CommandLine.Help;
+using Spectre.Console;
+using System.Linq;
+using Spectre.Console.Rendering;
 
 internal class Chiuaua {
     private enum ConsoleCtrlType {
@@ -21,34 +28,9 @@ internal class Chiuaua {
     // https://learn.microsoft.com/en-us/windows/console/handlerroutine?WT.mc_id=DT-MVP-5003978
     private delegate bool SetConsoleCtrlEventHandler(ConsoleCtrlType sig);
 
-    private static string Usage() =>
-        "\n\nNo frills UEVR injector. Chiuaua goes where bigger dogs won't."
-        + "\n\nUsage: "
-        + Process.GetCurrentProcess().ProcessName
-        + " --gameExe=game.exe --delay=20"
-
-        + "\n\n\t--gameExe=<full path to game.exe> - Unreal Engine executable to spawn and inject (mandatory)"
-        + "\n\t\tTypically game executables are located in \"Game_Code_Name\\Binaries\\Win64\" subfolder and"
-        + "\n\t\thave names ending in \"-Win64-Shipping.exe\" or \"-WinGDK-Shipping.exe\""
-
-        + "\n\t--delay=<seconds> - how long to wait before game is injected (optional)"
-        + "\n\t--launchCmd=<launcher URI / full .exe path> - launcher command to use (optional)"
-        + "\n\t--launchCmdArgs=<space separated list as single string> - launcher command arguments (optional)"
-
-        + "\n\nChiuaua is a good dogo! It will wait for you with console window open in case of errors."
-        + "\nIt will also tell you exactly what's going on as it happens."
-        + "\n\nClosing console window after injection will force close the game for those stubborn cases that fail to exit."
-
-        + "\n\nExample:"
-        + "\nUse Steam to launch Entropy Centre, wait 10s before injection:"
-        + "\n\nchiuaua --gameExe=\"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\Project_Kilo\\Binaries\\Win64\\EntropyCentre-Win64-Shipping.exe\" --launchCmd=\"steam://rungameid/1730590\" --delay=10"
-
-        + "\n\n\nAll this wouldn't be possible without Praydog, author of UEVR mod. All credit goes to him."
-        + "\n\t* Please support Praydog on Patreon: https://www.patreon.com/praydog"
-        + "\n\t* UEVR Project Website: https://uevr.io/"
-        + "\n\t* UEVR Github: https://github.com/praydog/UEVR"
-        + "\n\t* Flat2VR Discord : https://discord.com/invite/ZFSCSDe"
-        ;
+    private struct ConsoleCtrlEventArgs {
+        public static string gameExe = "";
+    }
 
     private static bool ConsoleCloseHandler(ConsoleCtrlType signal) {
         switch (signal) {
@@ -57,7 +39,7 @@ internal class Chiuaua {
             case ConsoleCtrlType.CTRL_LOGOFF_EVENT:
             case ConsoleCtrlType.CTRL_SHUTDOWN_EVENT:
             case ConsoleCtrlType.CTRL_CLOSE_EVENT:
-                Helpers.TryCloseGame(gameExe);
+                Helpers.TryCloseGame(ConsoleCtrlEventArgs.gameExe);
                 Environment.Exit(0);
                 return false;
 
@@ -66,54 +48,74 @@ internal class Chiuaua {
         }
     }
 
-    private static string gameExe = "";
-    private static string launchCmd = "";
-    private static string launchCmdArgs = "";
-    private static int injectionDelay = 5000;
+    private static int ParseArgs(string[] args) {
+        var delayOption = new Option<int>(name: "--delay", getDefaultValue: () => 5, description: "how long to wait before game is injected");
+        var launchCmdOption = new Option<string>(name: "--launch-cmd", description: "launcher command to use.");
+        var launchCmdArgsOption = new Option<string>(name: "--launch-args", description: "launcher command arguments, single string, space separated");
+        var gameExeArgument = new Argument<FileInfo>(name: "full path to game.exe", description: "Unreal Engine executable to spawn and inject");
 
-    private static void ParseArgs(string[] args) {
-        if (args.Length < 2) {
-            Helpers.ExitWithMessage(Usage(), 0);
-        }
+        var rootCommand = new RootCommand("No frills UEVR injector. Chiuaua goes where bigger dogs won't.") {
+            delayOption,
+            launchCmdOption,
+            launchCmdArgsOption,
+            gameExeArgument,
+        };
 
-        foreach (var arg in args) {
-            if (arg.StartsWith("--gameExe=")) {
-                gameExe = arg.Substring(arg.IndexOf("=") + 1);
-                continue;
+        rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs) => {
+            if (!gameExe.Exists) {
+                Helpers.ExitWithMessage($"Game executable: \"{gameExe.FullName}\" not found.");
             }
-            if (arg.StartsWith("--launchCmd=")) {
-                launchCmd = arg.Substring(arg.IndexOf("=") + 1);
-                continue;
-            }
-            if (arg.StartsWith("--launchCmdArgs=")) {
-                launchCmdArgs = arg.Substring(arg.IndexOf("=") + 1);
-                continue;
-            }
-            if (arg.StartsWith("--delay=")) {
-                try {
-                    injectionDelay = int.Parse(arg.Substring(arg.IndexOf("=") + 1)) * 1000;
-                } catch (Exception) {
-                    Helpers.ExitWithMessage("error parsing --delay=, " + arg.Split("=")[1] + " is not a valid int");
-                }
-                continue;
-            }
-        }
 
-        if (gameExe.Length == 0) {
-            Helpers.ExitWithMessage("You must specify game executable using --gameExe");
-        }
+            await RunAndInject(gameExe.FullName, launchCmd, launchCmdArgs, delay);
+        },
+        gameExeArgument,
+        delayOption,
+        launchCmdOption,
+        launchCmdArgsOption);
 
-        if (!Path.Exists(gameExe)) {
-            Helpers.ExitWithMessage(gameExe + " not found.");
-        }
+        var parser = new CommandLineBuilder(rootCommand)
+                        .UseDefaults()
+                        .UseHelp(ctx => {
+                            ctx.HelpBuilder.CustomizeSymbol(delayOption, firstColumnText: "--delay <number of seconds>");
+                            ctx.HelpBuilder.CustomizeSymbol(launchCmdOption, firstColumnText: "--launch-cmd <launcher URI / full .exe path>");
 
-        if (launchCmd.Length == 0) {
-            launchCmd = gameExe;
-        }
+                            ctx.HelpBuilder.CustomizeLayout(_ => HelpBuilder.Default.GetLayout()
+                                .Append(_ => {
+                                    AnsiConsole.MarkupLine("Chiuaua is a good dogo!");
+                                    AnsiConsole.Write(new Padder(new Markup("It will take care of downloading necessary .dlls, removing pesky VR plugins and streamline whole injection process."
+                                                          + "\n\nIn case of any error console window with explanation will wait for you when you exit your game."
+                                                          + "If main game process exits it will clean up the leftovers and terminate. So no window afterwards is a good sign."
+                                                          + "\n\nClosing console window after injection will force close the game for those stubborn cases that fail to exit."
+                                                          )).Padding(2, 0));
+                                })
+                                .Append(_ => {
+                                    AnsiConsole.MarkupLine("\n[bold]Example[/]");
+                                    AnsiConsole.Write(new Padder(new Markup("Use Steam to launch Entropy Centre, wait 10s before injection:")).Padding(2, 0));
 
-        if (injectionDelay <= 0) {
-            Helpers.ExitWithMessage("--delay= argument must be greater than 0");
-        }
+                                    // prevent splitting to multiple lines
+                                    var width = AnsiConsole.Profile.Width;
+                                    AnsiConsole.Profile.Width = 400;
+
+                                    AnsiConsole.Write(new Padder(new Markup("[dim]chiuaua \"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\Project_Kilo\\Binaries\\Win64\\EntropyCentre-Win64-Shipping.exe\" --launch-cmd \"steam://rungameid/1730590\" --delay 10[/]")).Padding(2, 0));
+
+                                    AnsiConsole.Profile.Width = width;
+
+                                })
+                                .Append(_ => {
+                                    AnsiConsole.MarkupLine("\n[bold]Credits[/]");
+                                    AnsiConsole.Write(new Padder(new Markup("All this wouldn't be possible without Praydog, author of UEVR mod. All credit goes to him.")).Padding(2, 0));
+                                    AnsiConsole.Write(new Padder(new Markup(
+                                                              "* Please support Praydog on Patreon: [blue link]https://www.patreon.com/praydog [/]\n"
+                                                            + "* UEVR Project Website: [blue link]https://uevr.io [/]\n"
+                                                            + "* UEVR Github: [blue link]https://github.com/praydog/UEVR [/]\n"
+                                                            + "* Flat2VR Discord: [blue link]https://discord.com/invite/ZFSCSDe [/]\n"
+                                                            )).Padding(4, 0));
+                                })
+                            );
+                        })
+                        .Build();
+
+        return parser.Invoke(args);
     }
 
     private static void SetupLogger() {
@@ -134,11 +136,18 @@ internal class Chiuaua {
         });
     }
 
-    private static async Task Main(string[] args) {
+    private static int Main(string[] args) {
         SetupLogger();
 
-        ParseArgs(args);
+        if (ParseArgs(args) != 0) {
+            Helpers.ExitWithMessage("Error parsing args.");
+        }
 
+        LogManager.Shutdown();
+        return 0;
+    }
+
+    private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS, int timeoutS = 60) {
         var exePath = Path.GetDirectoryName(Environment.ProcessPath);
         if (!Helpers.CheckDLLsPresent(exePath ?? "")) {
             Logger.Info("Attempting to download missing files...");
@@ -148,22 +157,22 @@ internal class Chiuaua {
         Helpers.RemoveUnwantedPlugins(gameExe);
 
         Process.Start(new ProcessStartInfo {
-            FileName = launchCmd,
+            FileName = launchCmd ?? gameExe,
+            Arguments = launchCmdArgs ?? "",
             UseShellExecute = true,
-            Arguments = launchCmdArgs
         });
 
         Logger.Info("Waiting for {0} to spawn", Path.GetFileName(gameExe));
 
-        if (await Helpers.WaitForGameProcessAsync(gameExe, 30 * 1000)) {
+        if (await Helpers.WaitForGameProcessAsync(gameExe, timeoutS)) {
             Logger.Debug("Game process found");
         } else {
             Helpers.ExitWithMessage("Timed out while waiting for game process");
         }
 
-        Logger.Info("Waiting {0}s before injection.", injectionDelay / 1000.0);
+        Logger.Info("Waiting {0}s before injection.", injectionDelayS);
 
-        await Task.Delay(injectionDelay);
+        await Task.Delay(injectionDelayS * 1000);
 
         var mainGameProcess = Helpers.GetMainGameProces(gameExe);
         if (mainGameProcess == null) {
@@ -176,6 +185,7 @@ internal class Chiuaua {
 
         Logger.Info("Injection done, close this window to kill game process.");
 
+        ConsoleCtrlEventArgs.gameExe = gameExe;
         SetConsoleCtrlHandler(ConsoleCloseHandler, true);
 
         while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
@@ -188,8 +198,5 @@ internal class Chiuaua {
             Logger.Debug("Leftover game process detected. Terminating...");
             Helpers.TryCloseGame(gameExe);
         }
-
-        NLog.LogManager.Shutdown();
-        Environment.Exit(0);
     }
 }
