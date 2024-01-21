@@ -7,8 +7,6 @@ using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using System.CommandLine.Help;
 using Spectre.Console;
-using System.Linq;
-using Spectre.Console.Rendering;
 
 internal class Chiuaua {
     private enum ConsoleCtrlType {
@@ -157,7 +155,7 @@ internal class Chiuaua {
         return 0;
     }
 
-    private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS, int timeoutS = 60) {
+    private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS, int waitForGameTimeoutS = 60) {
         var ownExePath = Path.GetDirectoryName(Environment.ProcessPath);
         if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
             Logger.Info("Attempting to download missing files...");
@@ -187,14 +185,16 @@ internal class Chiuaua {
 
         Logger.Info("Waiting for {0} to spawn", Path.GetFileName(gameExe));
 
-        if (await Helpers.WaitForGameProcessAsync(gameExe, timeoutS)) {
+        if (await Helpers.WaitForGameProcessAsync(gameExe, waitForGameTimeoutS)) {
             Logger.Debug("Game process found");
         } else {
             Helpers.ExitWithMessage("Timed out while waiting for game process");
         }
 
         ConsoleCtrlEventArgs.gameExe = gameExe;
-        SetConsoleCtrlHandler(ConsoleCloseHandler, true);
+        if (SetConsoleCtrlHandler(ConsoleCloseHandler, true) == false) {
+            Helpers.ExitWithMessage("Failed to attach console close handler.");
+        }
 
         Logger.Info("Waiting {0}s before injection.", injectionDelayS);
 
