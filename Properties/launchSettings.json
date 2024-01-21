@@ -2,7 +2,7 @@
   "profiles": {
     "chiuaua": {
       "commandName": "Project",
-      "commandLineArgs": "--gameExe=\"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\Project_Kilo\\Binaries\\Win64\\EntropyCentre-Win64-Shipping.exe\" --launchCmd=\"steam://rungameid/1730590\" --delay=10"
+      "commandLineArgs": "\"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\EntropyCentre.exe\" --delay 20 --verbose"
     }
   }
 }

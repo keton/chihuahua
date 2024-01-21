@@ -1,4 +1,7 @@
 ﻿using chiuaua;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
@@ -22,15 +25,19 @@ internal static class Helpers {
     ];
 
     public static bool CheckDLLsPresent(string exePath) {
+
+        bool ret = true;
+
         foreach (string dll in uevr_dlls) {
             var dllWithPath = Path.Combine(exePath, dll);
 
             if (!Path.Exists(dllWithPath)) {
-                return false;
+                Logger.Warn($"{dll} not found");
+                ret = false;
             }
         }
 
-        return true;
+        return ret;
     }
 
     public static async Task DownloadUEVRAsync() {
@@ -48,7 +55,7 @@ internal static class Helpers {
             }
 
         } catch (Exception e) {
-            ExitWithMessage("Error downloading: " + e.Message);
+            ExitWithMessage("Error while downloading: " + e.Message);
         }
     }
 
@@ -182,5 +189,27 @@ internal static class Helpers {
         }
 
         return gameProcess != null;
+    }
+
+    public static bool isUnrealExecutable(string gameExe) {
+        var ueSuffixes = ImmutableArray.Create("-WinGDK-Shipping", "-Win64-Shipping");
+
+        return ueSuffixes.Any((elem) => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem));
+    }
+
+    public static string? tryFindMainExecutable(string gameExe) {
+        if (isUnrealExecutable(gameExe)) return gameExe;
+
+        var mainExeGlobs = ImmutableArray.Create("*\\Binaries\\Win64\\*-Win64-Shipping.exe", "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe");
+
+        var matcher = new Matcher();
+        matcher.AddIncludePatterns(mainExeGlobs);
+        var result = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(Path.GetDirectoryName(gameExe) ?? "")));
+
+        if (result.HasMatches) {
+            return Path.Join(Path.GetDirectoryName(gameExe), result.Files.First().Path.Replace('/', '\\'));
+        }
+
+        return null;
     }
 }

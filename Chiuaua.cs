@@ -49,19 +49,23 @@ internal class Chiuaua {
     }
 
     private static int ParseArgs(string[] args) {
-        var delayOption = new Option<int>(name: "--delay", getDefaultValue: () => 5, description: "how long to wait before game is injected");
+        var delayOption = new Option<int>(aliases: ["--delay", "-d"], getDefaultValue: () => 5, description: "how long to wait before game is injected");
         var launchCmdOption = new Option<string>(name: "--launch-cmd", description: "launcher command to use.");
         var launchCmdArgsOption = new Option<string>(name: "--launch-args", description: "launcher command arguments, single string, space separated");
         var gameExeArgument = new Argument<FileInfo>(name: "full path to game.exe", description: "Unreal Engine executable to spawn and inject");
+        var verboseOption = new Option<bool>(aliases: ["--verbose", "-v"], description: "enable debug output");
 
         var rootCommand = new RootCommand("No frills UEVR injector. Chiuaua goes where bigger dogs won't.") {
             delayOption,
             launchCmdOption,
             launchCmdArgsOption,
             gameExeArgument,
+            verboseOption,
         };
 
-        rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs) => {
+        rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs, verbose) => {
+            SetupLogger(verbose);
+
             if (!gameExe.Exists) {
                 Helpers.ExitWithMessage($"Game executable: \"{gameExe.FullName}\" not found.");
             }
@@ -71,12 +75,13 @@ internal class Chiuaua {
         gameExeArgument,
         delayOption,
         launchCmdOption,
-        launchCmdArgsOption);
+        launchCmdArgsOption,
+        verboseOption);
 
         var parser = new CommandLineBuilder(rootCommand)
                         .UseDefaults()
                         .UseHelp(ctx => {
-                            ctx.HelpBuilder.CustomizeSymbol(delayOption, firstColumnText: "--delay <number of seconds>");
+                            ctx.HelpBuilder.CustomizeSymbol(delayOption, firstColumnText: "-d, --delay <number of seconds>");
                             ctx.HelpBuilder.CustomizeSymbol(launchCmdOption, firstColumnText: "--launch-cmd <launcher URI / full .exe path>");
 
                             ctx.HelpBuilder.CustomizeLayout(_ => HelpBuilder.Default.GetLayout()
@@ -118,11 +123,17 @@ internal class Chiuaua {
         return parser.Invoke(args);
     }
 
-    private static void SetupLogger() {
+    private static void SetupLogger(bool verbose = false) {
+
+        var logLevel = LogLevel.Info;
+        if (verbose) {
+            logLevel = LogLevel.Debug;
+        }
+
         LogManager.Setup().LoadConfiguration(builder => {
 
             var coloredConsole = new ColoredConsoleTarget() {
-                Layout = "${time}|${pad:padding=5:inner=${level:uppercase=true}}|${logger}|${message:withexception=true}",
+                Layout = "${pad:padding=5:inner=${level:uppercase=true}}(${logger}): ${message:withexception=true}",
                 RowHighlightingRules = {
                     new ConsoleRowHighlightingRule("level == LogLevel.Debug", ConsoleOutputColor.DarkGray, ConsoleOutputColor.NoChange),
                     new ConsoleRowHighlightingRule("level == LogLevel.Info", ConsoleOutputColor.White, ConsoleOutputColor.NoChange),
@@ -132,12 +143,11 @@ internal class Chiuaua {
                 }
             };
 
-            builder.ForLogger().FilterMinLevel(LogLevel.Info).WriteTo(coloredConsole);
+            builder.ForLogger().FilterMinLevel(logLevel).WriteTo(coloredConsole);
         });
     }
 
     private static int Main(string[] args) {
-        SetupLogger();
 
         if (ParseArgs(args) != 0) {
             Helpers.ExitWithMessage("Error parsing args.");
@@ -148,11 +158,24 @@ internal class Chiuaua {
     }
 
     private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS, int timeoutS = 60) {
-        var exePath = Path.GetDirectoryName(Environment.ProcessPath);
-        if (!Helpers.CheckDLLsPresent(exePath ?? "")) {
+        var ownExePath = Path.GetDirectoryName(Environment.ProcessPath);
+        if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
             Logger.Info("Attempting to download missing files...");
             await Helpers.DownloadUEVRAsync();
+
+            if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
+                Helpers.ExitWithMessage($"Files still missing after download, you may want to add \"{ownExePath}\" to your antivirus exceptions");
+            }
         }
+
+        var mainGameExe = Helpers.tryFindMainExecutable(gameExe);
+        if (mainGameExe == null) {
+            Helpers.ExitWithMessage(Path.GetFileName(gameExe) + " Does not look like UE game executable and no suitable candidate was found.");
+        }
+
+        Logger.Debug($"Found {mainGameExe}\nas main executable for {gameExe}");
+
+        gameExe = mainGameExe;
 
         Helpers.RemoveUnwantedPlugins(gameExe);
 
@@ -170,6 +193,9 @@ internal class Chiuaua {
             Helpers.ExitWithMessage("Timed out while waiting for game process");
         }
 
+        ConsoleCtrlEventArgs.gameExe = gameExe;
+        SetConsoleCtrlHandler(ConsoleCloseHandler, true);
+
         Logger.Info("Waiting {0}s before injection.", injectionDelayS);
 
         await Task.Delay(injectionDelayS * 1000);
@@ -184,9 +210,6 @@ internal class Chiuaua {
         Helpers.InjectDll(mainGameProcess.Id, "UEVRBackend.dll");
 
         Logger.Info("Injection done, close this window to kill game process.");
-
-        ConsoleCtrlEventArgs.gameExe = gameExe;
-        SetConsoleCtrlHandler(ConsoleCloseHandler, true);
 
         while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
             await Task.Delay(100);
