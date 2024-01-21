@@ -30,7 +30,7 @@ internal static class Helpers {
             var dllWithPath = Path.Combine(exePath, dll);
 
             if (!Path.Exists(dllWithPath)) {
-                Logger.Warn($"{dll} not found");
+                Logger.Warn($"[dim]{dll}[/] not found");
                 ret = false;
             }
         }
@@ -58,7 +58,7 @@ internal static class Helpers {
     }
 
     [DoesNotReturn]
-    public static void WaitForKeyAndExit(int exitCode = 1) {  
+    public static void WaitForKeyAndExit(int exitCode = 1) {
         Console.ReadKey();
         Environment.Exit(exitCode);
     }
@@ -67,10 +67,11 @@ internal static class Helpers {
     public static void ExitWithMessage(string message, int exitCode = 1) {
         if (exitCode == 0) {
             Logger.Info(message);
+            AnsiConsole.WriteLine("Press any key to exit...");
         } else {
             Logger.Fatal(message);
+            AnsiConsole.MarkupLine("[white on red]Error. Press any key to exit...[/]");
         }
-        AnsiConsole.WriteLine("Press any key to exit...");
         WaitForKeyAndExit(exitCode);
     }
 
@@ -203,6 +204,17 @@ internal static class Helpers {
         }
 
         return gameProcess != null;
+    }
+
+    public static async Task WaitBeforeInjectionAsync(StatusContext ctx, int waitTimeS, int timeStepMs = 500) {
+        int elapsedMs = 0;
+        int waitTimeMs = waitTimeS * 1000;
+
+        while (elapsedMs < waitTimeMs) {
+            ctx.Status($"Waiting before injection, [green]{(int)((waitTimeMs - elapsedMs) / 1000)}s[/] remaining...");
+            elapsedMs += timeStepMs;
+            await Task.Delay(timeStepMs);
+        }
     }
 
     public static bool isUnrealExecutable(string gameExe) {

@@ -17,7 +17,7 @@ namespace chiuaua {
 
         public static void Debug(string message) {
             if (verbose) {
-                Log("[dim]DEBUG: [/]", $"[dim]{message}[/]");
+                Log("[dim]DEBUG: [/]", $"[gray]{message}[/]");
             }
         }
         public static void Info(string message) {
