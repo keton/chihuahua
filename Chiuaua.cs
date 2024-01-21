@@ -1,12 +1,11 @@
-﻿using NLog;
-using NLog.Targets;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using System.CommandLine.Help;
 using Spectre.Console;
+using chiuaua;
 
 internal class Chiuaua {
     private enum ConsoleCtrlType {
@@ -16,8 +15,6 @@ internal class Chiuaua {
         CTRL_LOGOFF_EVENT = 5,
         CTRL_SHUTDOWN_EVENT = 6
     }
-
-    private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
     // https://learn.microsoft.com/en-us/windows/console/setconsolectrlhandler?WT.mc_id=DT-MVP-5003978
     [DllImport("Kernel32")]
@@ -62,7 +59,7 @@ internal class Chiuaua {
         };
 
         rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs, verbose) => {
-            SetupLogger(verbose);
+            Logger.verbose = verbose;
 
             if (!gameExe.Exists) {
                 Helpers.ExitWithMessage($"Game executable: \"{gameExe.FullName}\" not found.");
@@ -121,37 +118,12 @@ internal class Chiuaua {
         return parser.Invoke(args);
     }
 
-    private static void SetupLogger(bool verbose = false) {
-
-        var logLevel = LogLevel.Info;
-        if (verbose) {
-            logLevel = LogLevel.Debug;
-        }
-
-        LogManager.Setup().LoadConfiguration(builder => {
-
-            var coloredConsole = new ColoredConsoleTarget() {
-                Layout = "${pad:padding=5:inner=${level:uppercase=true}}(${logger}): ${message:withexception=true}",
-                RowHighlightingRules = {
-                    new ConsoleRowHighlightingRule("level == LogLevel.Debug", ConsoleOutputColor.DarkGray, ConsoleOutputColor.NoChange),
-                    new ConsoleRowHighlightingRule("level == LogLevel.Info", ConsoleOutputColor.White, ConsoleOutputColor.NoChange),
-                    new ConsoleRowHighlightingRule("level == LogLevel.Warn", ConsoleOutputColor.Yellow, ConsoleOutputColor.NoChange),
-                    new ConsoleRowHighlightingRule("level == LogLevel.Error", ConsoleOutputColor.Red, ConsoleOutputColor.NoChange),
-                    new ConsoleRowHighlightingRule("level == LogLevel.Fatal", ConsoleOutputColor.Magenta, ConsoleOutputColor.NoChange),
-                }
-            };
-
-            builder.ForLogger().FilterMinLevel(logLevel).WriteTo(coloredConsole);
-        });
-    }
-
     private static int Main(string[] args) {
 
         if (ParseArgs(args) != 0) {
             Helpers.ExitWithMessage("Error parsing args.");
         }
 
-        LogManager.Shutdown();
         return 0;
     }
 
@@ -171,55 +143,64 @@ internal class Chiuaua {
             Helpers.ExitWithMessage(Path.GetFileName(gameExe) + " Does not look like UE game executable and no suitable candidate was found.");
         }
 
-        Logger.Debug($"Found {mainGameExe}\nas main executable for {gameExe}");
+        Logger.Debug($"Found {mainGameExe} as main executable for {gameExe}");
 
         gameExe = mainGameExe;
 
         Helpers.RemoveUnwantedPlugins(gameExe);
 
-        Process.Start(new ProcessStartInfo {
-            FileName = launchCmd ?? gameExe,
-            Arguments = launchCmdArgs ?? "",
-            UseShellExecute = true,
+        await AnsiConsole.Status()
+            .AutoRefresh(true)
+            .Spinner(Spinner.Known.Default)
+            .StartAsync("About to start game...", async ctx => {
+
+            Process.Start(new ProcessStartInfo {
+                FileName = launchCmd ?? gameExe,
+                Arguments = launchCmdArgs ?? "",
+                UseShellExecute = true,
+            });
+
+            Logger.Info($"Waiting for {Path.GetFileName(gameExe)} to spawn");
+            ctx.Status("Waiting for game to start...");
+
+            if (await Helpers.WaitForGameProcessAsync(gameExe, waitForGameTimeoutS)) {
+                Logger.Debug("Game process found");
+            } else {
+                Helpers.ExitWithMessage(ctx, "Timed out while waiting for game process");
+            }
+
+            ConsoleCtrlEventArgs.gameExe = gameExe;
+            if (SetConsoleCtrlHandler(ConsoleCloseHandler, true) == false) {
+                Helpers.ExitWithMessage(ctx, "Failed to attach console close handler.");
+            }
+
+            Logger.Info($"Waiting {injectionDelayS}s before injection.");
+            ctx.Status("Game process detected...");
+
+            await Task.Delay(injectionDelayS * 1000);
+
+            var mainGameProcess = Helpers.GetMainGameProces(gameExe);
+            if (mainGameProcess == null) {
+                Helpers.ExitWithMessage(ctx, Path.GetFileName(gameExe) + " exited before it could be injected.");
+            }
+
+            Helpers.NullifyPlugins(mainGameProcess.Id);
+            Helpers.InjectDll(mainGameProcess.Id, "openxr_loader.dll");
+            Helpers.InjectDll(mainGameProcess.Id, "UEVRBackend.dll");
+
+            Logger.Info("Injection done, close this window to kill game process.");
+            ctx.Status("Game injected and running...");
+
+            while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
+                await Task.Delay(100);
+            }
+
+            Logger.Info("Game has exitted.");
+
+            if (Helpers.GetGameProceses(gameExe).Length > 0) {
+                Logger.Debug("Leftover game process detected. Terminating...");
+                Helpers.TryCloseGame(gameExe);
+            }
         });
-
-        Logger.Info("Waiting for {0} to spawn", Path.GetFileName(gameExe));
-
-        if (await Helpers.WaitForGameProcessAsync(gameExe, waitForGameTimeoutS)) {
-            Logger.Debug("Game process found");
-        } else {
-            Helpers.ExitWithMessage("Timed out while waiting for game process");
-        }
-
-        ConsoleCtrlEventArgs.gameExe = gameExe;
-        if (SetConsoleCtrlHandler(ConsoleCloseHandler, true) == false) {
-            Helpers.ExitWithMessage("Failed to attach console close handler.");
-        }
-
-        Logger.Info("Waiting {0}s before injection.", injectionDelayS);
-
-        await Task.Delay(injectionDelayS * 1000);
-
-        var mainGameProcess = Helpers.GetMainGameProces(gameExe);
-        if (mainGameProcess == null) {
-            Helpers.ExitWithMessage(Path.GetFileName(gameExe) + " exited before it could be injected.");
-        }
-
-        Helpers.NullifyPlugins(mainGameProcess.Id);
-        Helpers.InjectDll(mainGameProcess.Id, "openxr_loader.dll");
-        Helpers.InjectDll(mainGameProcess.Id, "UEVRBackend.dll");
-
-        Logger.Info("Injection done, close this window to kill game process.");
-
-        while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
-            await Task.Delay(100);
-        }
-
-        Logger.Info("Game has exitted.");
-
-        if (Helpers.GetGameProceses(gameExe).Length > 0) {
-            Logger.Debug("Leftover game process detected. Terminating...");
-            Helpers.TryCloseGame(gameExe);
-        }
     }
 }

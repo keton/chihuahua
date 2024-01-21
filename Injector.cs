@@ -14,8 +14,6 @@ namespace chiuaua {
      */
     internal class Injector {
 
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
         [DllImport("kernel32.dll")]
         public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
@@ -113,7 +111,7 @@ namespace chiuaua {
                         }
                     }
                 } catch (Exception ex) {
-                    Logger.Error(ex);
+                    Logger.Error($"Exception: {ex.Message}");
                 }
 
             return true;

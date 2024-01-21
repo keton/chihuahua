@@ -1,15 +1,13 @@
 ﻿using chiuaua;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using Spectre.Console;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 
 internal static class Helpers {
-
-    private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
     private static readonly string uevrDownloadURL = "https://github.com/praydog/UEVR/releases/latest/download/UEVR.zip";
 
     private static readonly string[] uevr_dlls = [
@@ -60,18 +58,34 @@ internal static class Helpers {
     }
 
     [DoesNotReturn]
+    public static void WaitForKeyAndExit(int exitCode = 1) {  
+        Console.ReadKey();
+        Environment.Exit(exitCode);
+    }
+
+    [DoesNotReturn]
     public static void ExitWithMessage(string message, int exitCode = 1) {
         if (exitCode == 0) {
             Logger.Info(message);
         } else {
             Logger.Fatal(message);
         }
+        AnsiConsole.WriteLine("Press any key to exit...");
+        WaitForKeyAndExit(exitCode);
+    }
 
-        Console.WriteLine("\nPress any key to continue...");
-        Console.ReadKey();
+    [DoesNotReturn]
+    public static void ExitWithMessage(StatusContext ctx, string message, int exitCode = 1) {
+        if (exitCode == 0) {
+            Logger.Info(message);
+            ctx.Status("Press any key to exit...");
+        } else {
+            Logger.Fatal(message);
+            ctx.Spinner(new Logger.ErrorSpinner());
+            ctx.Status("[white on red]Error. Press any key to exit...[/]");
+        }
 
-        NLog.LogManager.Shutdown();
-        Environment.Exit(exitCode);
+        WaitForKeyAndExit(exitCode);
     }
 
     private static string? GetGamePluginsDir(string gameExe) {
