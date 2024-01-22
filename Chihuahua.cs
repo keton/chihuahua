@@ -5,10 +5,10 @@ using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using System.CommandLine.Help;
 using Spectre.Console;
-using chiuaua;
+using chihuahua;
 using System.Text;
 
-internal class Chiuaua {
+internal class Chihuahua {
     private enum ConsoleCtrlType {
         CTRL_C_EVENT = 0,
         CTRL_BREAK_EVENT = 1,
@@ -51,7 +51,7 @@ internal class Chiuaua {
         var gameExeArgument = new Argument<FileInfo>(name: "full path to game.exe", description: "Unreal Engine executable to spawn and inject");
         var verboseOption = new Option<bool>(aliases: ["--verbose", "-v"], description: "enable debug output");
 
-        var rootCommand = new RootCommand("No frills UEVR injector. Chiuaua goes where bigger dogs won't.") {
+        var rootCommand = new RootCommand("No frills UEVR injector. Chihuahua goes where bigger dogs won't.") {
             delayOption,
             launchCmdOption,
             launchCmdArgsOption,
@@ -67,7 +67,7 @@ internal class Chiuaua {
 
                             ctx.HelpBuilder.CustomizeLayout(_ => HelpBuilder.Default.GetLayout()
                                 .Append(_ => {
-                                    AnsiConsole.MarkupLine("Chiuaua is a good dogo!");
+                                    AnsiConsole.MarkupLine("Chihuahua is a good dogo!");
                                     AnsiConsole.Write(new Padder(new Markup("It will take care of downloading necessary .dlls, removing pesky VR plugins and streamline whole injection process."
                                                           + "\n\nIn case of any error console window with explanation will wait for you when you exit your game."
                                                           + "If main game process exits it will clean up the leftovers and terminate. [underline]No window afterwards is a good sign.[/]"
@@ -82,7 +82,7 @@ internal class Chiuaua {
                                     var width = AnsiConsole.Profile.Width;
                                     AnsiConsole.Profile.Width = 400;
 
-                                    AnsiConsole.Write(new Padder(new Markup("[dim]chiuaua \"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\Project_Kilo\\Binaries\\Win64\\EntropyCentre-Win64-Shipping.exe\" --launch-cmd \"steam://rungameid/1730590\" --delay 10[/]")).Padding(2, 0));
+                                    AnsiConsole.Write(new Padder(new Markup("[dim]chihuahua \"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\Project_Kilo\\Binaries\\Win64\\EntropyCentre-Win64-Shipping.exe\" --launch-cmd \"steam://rungameid/1730590\" --delay 10[/]")).Padding(2, 0));
 
                                     AnsiConsole.Profile.Width = width;
 
@@ -145,7 +145,7 @@ internal class Chiuaua {
                 Helpers.ExitWithMessage($"Files still missing after download, you may want to add [dim]{ownExePath}[/] to your antivirus exceptions");
             }
         } else {
-            if(await Helpers.UpdateUEVRAsync() == false) {
+            if (await Helpers.UpdateUEVRAsync() == false) {
                 Logger.Warn("Failed to check UEVR updates");
             }
         }

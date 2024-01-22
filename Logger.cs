@@ -1,6 +1,6 @@
 ﻿using Spectre.Console;
 
-namespace chiuaua {
+namespace chihuahua {
     internal static class Logger {
 
         public static bool verbose = false;

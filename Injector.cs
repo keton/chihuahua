@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace chiuaua {
+namespace chihuahua {
     /*
      * Shamelessly stolen from UEVR frontend: https://github.com/praydog/uevr-frontend/blob/main/UEVR/Injector.cs
      * 

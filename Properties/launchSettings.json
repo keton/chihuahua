@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "chiuaua": {
+    "chihuahua": {
       "commandName": "Project",
       "commandLineArgs": "\"D:\\Games\\SteamLibrary\\steamapps\\common\\The Entropy Centre\\EntropyCentre.exe\" --delay 20 --verbose"
     }

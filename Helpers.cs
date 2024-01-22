@@ -1,4 +1,4 @@
-﻿using chiuaua;
+﻿using chihuahua;
 using GitHub;
 using GitHub.Client;
 using Microsoft.Extensions.FileSystemGlobbing;
@@ -174,7 +174,7 @@ internal static class Helpers {
 
             Logger.Debug($"Latest version: {latestRelease.TagName}");
 
-            // don't update if version file is missing. Allows manual unpacking UEVR to chiuaua directory
+            // don't update if version file is missing. Allows manual unpacking UEVR to chihuahua directory
             if (forceDownload || ((currentVersion != latestRelease.TagName) && (currentVersion != ""))) {
                 Logger.Info($"Updating UEVR to {latestRelease.TagName}");
 

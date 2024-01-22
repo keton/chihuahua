@@ -1,9 +1,12 @@
 {
   "version": "0.1",
   "runnable": {
-    "path": "chiuaua.exe",
+    "path": "chihuahua.exe",
     "args": [
-      "{{ExecutablePath}}", "--delay", "20", "--launch-cmd", "{{StartCommand}}", "--launch-args", "{{StartCommandArgs}}"
+      "{{ExecutablePath}}",
+      "--delay", "20",
+      "--launch-cmd", "{{StartCommand}}",
+      "--launch-args", "{{StartCommandArgs}}"
     ]
   },
   "engine": "Unreal",
