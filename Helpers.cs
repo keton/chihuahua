@@ -5,7 +5,9 @@ using Spectre.Console;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO.Compression;
+using System.Net.Http.Handlers;
 
 internal static class Helpers {
     private static readonly string uevrDownloadURL = "https://github.com/praydog/UEVR/releases/latest/download/UEVR.zip";
@@ -38,19 +40,94 @@ internal static class Helpers {
         return ret;
     }
 
+    public static string FileSizeToHumanReadable(long bytes) {
+        string suffix;
+        double readable;
+        switch (Math.Abs(bytes)) {
+            case >= 0x1000000000000000:
+                suffix = "EiB";
+                readable = bytes >> 50;
+                break;
+            case >= 0x4000000000000:
+                suffix = "PiB";
+                readable = bytes >> 40;
+                break;
+            case >= 0x10000000000:
+                suffix = "TiB";
+                readable = bytes >> 30;
+                break;
+            case >= 0x40000000:
+                suffix = "GiB";
+                readable = bytes >> 20;
+                break;
+            case >= 0x100000:
+                suffix = "MiB";
+                readable = bytes >> 10;
+                break;
+            case >= 0x400:
+                suffix = "KiB";
+                readable = bytes;
+                break;
+            default:
+                return bytes.ToString("0 B");
+        }
+
+        return (readable / 1024).ToString("0.## ", CultureInfo.InvariantCulture) + suffix;
+    }
+
     public static async Task DownloadUEVRAsync() {
         try {
-            using var client = new HttpClient();
-            using var s = await client.GetStreamAsync(uevrDownloadURL);
-            using var stream = new MemoryStream();
-            await s.CopyToAsync(stream);
-            using var zipArchive = new ZipArchive(stream);
 
-            foreach (var entry in zipArchive.Entries) {
-                if (uevr_dlls.Contains(entry.Name)) {
-                    entry.ExtractToFile(Path.Join(Path.GetDirectoryName(Environment.ProcessPath), entry.Name), true);
-                }
-            }
+            var handler = new HttpClientHandler() { AllowAutoRedirect = true };
+            var ph = new ProgressMessageHandler(handler);
+
+            await AnsiConsole
+                            .Progress()
+                            .Columns(new ProgressColumn[]
+                            {
+                                new TaskDescriptionColumn(),    // Task description
+                                new ProgressBarColumn(),        // Progress bar
+                                new PercentageColumn(),         // Percentage
+                                new RemainingTimeColumn(),      // Remaining time
+                                new SpinnerColumn(),            // Spinner
+                            })
+                            .StartAsync(async ctx => {
+
+                                var downloadTask = ctx.AddTask("Downloading UEVR files");
+
+                                long lastBytesTransferred = 0;
+
+                                ph.HttpReceiveProgress += (_, args) => {
+                                    Logger.Debug($"Download progress: {args.ProgressPercentage}% {FileSizeToHumanReadable(args.BytesTransferred)}/{FileSizeToHumanReadable(args.TotalBytes ?? 0)}");
+                                    downloadTask.MaxValue = args.TotalBytes ?? 0;
+
+                                    var bytesPerTick = args.BytesTransferred - lastBytesTransferred;
+                                    lastBytesTransferred = args.BytesTransferred;
+
+                                    downloadTask.Increment(bytesPerTick);
+                                };
+
+                                using var client = new HttpClient(ph);
+                                using var s = await client.GetStreamAsync(uevrDownloadURL);
+
+                                using var stream = new MemoryStream();
+                                await s.CopyToAsync(stream);
+                                using var zipArchive = new ZipArchive(stream);
+
+                                downloadTask.StopTask();
+
+                                var unpackTask = ctx.AddTask("Unpacking UEVR files");
+                                unpackTask.MaxValue = uevr_dlls.Length;
+
+                                foreach (var entry in zipArchive.Entries) {
+                                    if (uevr_dlls.Contains(entry.Name)) {
+                                        entry.ExtractToFile(Path.Join(Path.GetDirectoryName(Environment.ProcessPath), entry.Name), true);
+                                        unpackTask.Increment(1);
+                                    }
+                                }
+
+                                unpackTask.StopTask();
+                            });
 
         } catch (Exception e) {
             ExitWithMessage("Error while downloading: [dim]" + e.Message + "[/]");
