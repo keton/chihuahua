@@ -141,9 +141,17 @@ internal static class Helpers {
         }
     }
 
-    public static async Task<bool> CheckUEVRReleaseAsync() {
+    public static async Task<bool> UpdateUEVRAsync(bool forceDownload = false) {
         try {
+            var uevrVersionPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath), "uevr.version");
+            var currentVersion = "";
+
+            try {
+                currentVersion = File.ReadAllLines(uevrVersionPath)[0].Trim().Replace("\n", "");
+            } catch (Exception) { }
+
             var releases = await new GitHubClient(RequestAdapter.Create(new AnonymousAuthenticationProvider())).Repos["praydog"]["UEVR"].Releases.GetAsync();
+
             if (releases == null) {
                 Logger.Error("Github responded with empty UEVR releases");
                 return false;
@@ -154,16 +162,40 @@ internal static class Helpers {
                 return false;
             }
 
-            Logger.Debug($"Latest version: {latestRelease.TagName}");
-
-            var uevrAssets = latestRelease.Assets.Where(asset => asset.Name == "UEVR.zip");
-
-            if (uevrAssets.Count() != 1) {
-                Logger.Error($"[dim]UEVR.zip[/] asset not found in UEVR release {latestRelease.TagName}. Download and unpack files manually.");
-                return false;
+            if (!forceDownload) {
+                if (currentVersion == "") {
+                    Logger.Info($"Manual UEVR installation detected. Auto update won't be performed.");
+                } else {
+                    Logger.Debug($"Currently installed version: {currentVersion}");
+                }
+            } else {
+                Logger.Debug("Forced update");
             }
 
-            return await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
+            Logger.Debug($"Latest version: {latestRelease.TagName}");
+
+            // don't update if version file is missing. Allows manual unpacking UEVR to chiuaua directory
+            if (forceDownload || ((currentVersion != latestRelease.TagName) && (currentVersion != ""))) {
+                Logger.Info($"Updating UEVR to {latestRelease.TagName}");
+
+                var uevrAssets = latestRelease.Assets.Where(asset => asset.Name == "UEVR.zip");
+
+                if (uevrAssets.Count() != 1) {
+                    Logger.Error($"[dim]UEVR.zip[/] asset not found in UEVR release {latestRelease.TagName}. Download and unpack files manually.");
+                    return false;
+                }
+
+                var downladSuceeded = await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
+
+                if (downladSuceeded) {
+                    File.WriteAllText(uevrVersionPath, latestRelease.TagName + "\n");
+                }
+
+                return downladSuceeded;
+            }
+
+            Logger.Debug("Skipping UEVR update");
+            return true;
         } catch (Exception e) {
             Logger.Error($"Got exception while checking for UEVR releases: [dim]{e.Message}[/]");
             return false;
@@ -324,20 +356,20 @@ internal static class Helpers {
         int waitTimeMs = waitTimeS * 1000;
 
         while (elapsedMs < waitTimeMs) {
-            ctx.Status($"Waiting before injection, [green]{(int)((waitTimeMs - elapsedMs) / 1000)}s[/] remaining...");
+            ctx.Status($"Waiting before injection, [green]{(waitTimeMs - elapsedMs) / 1000}s[/] remaining...");
             elapsedMs += timeStepMs;
             await Task.Delay(timeStepMs);
         }
     }
 
-    public static bool isUnrealExecutable(string gameExe) {
+    public static bool IsUnrealExecutable(string gameExe) {
         var ueSuffixes = ImmutableArray.Create("-WinGDK-Shipping", "-Win64-Shipping");
 
-        return ueSuffixes.Any((elem) => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem));
+        return ueSuffixes.Any(elem => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem));
     }
 
-    public static string? tryFindMainExecutable(string gameExe) {
-        if (isUnrealExecutable(gameExe)) return gameExe;
+    public static string? TryFindMainExecutable(string gameExe) {
+        if (IsUnrealExecutable(gameExe)) return gameExe;
 
         var mainExeGlobs = ImmutableArray.Create("*\\Binaries\\Win64\\*-Win64-Shipping.exe", "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe");
 

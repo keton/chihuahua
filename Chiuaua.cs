@@ -137,16 +137,20 @@ internal class Chiuaua {
         if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
 
             Logger.Info("Attempting to download missing files...");
-            if (await Helpers.CheckUEVRReleaseAsync() == false) {
+            if (await Helpers.UpdateUEVRAsync(forceDownload: true) == false) {
                 Helpers.ExitWithMessage($"UEVR download failed.");
             }
 
             if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
                 Helpers.ExitWithMessage($"Files still missing after download, you may want to add [dim]{ownExePath}[/] to your antivirus exceptions");
             }
+        } else {
+            if(await Helpers.UpdateUEVRAsync() == false) {
+                Logger.Warn("Failed to check UEVR updates");
+            }
         }
 
-        var mainGameExe = Helpers.tryFindMainExecutable(gameExe);
+        var mainGameExe = Helpers.TryFindMainExecutable(gameExe);
         if (mainGameExe == null) {
             Helpers.ExitWithMessage($"[dim]{Path.GetFileName(gameExe)}[/] does not look like UE game executable and no suitable candidate was found.");
         }
