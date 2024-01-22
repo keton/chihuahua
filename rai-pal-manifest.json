@@ -3,7 +3,7 @@
   "runnable": {
     "path": "chiuaua.exe",
     "args": [
-      "--gameExe={{ExecutablePath}}", "--delay=20", "--launchCmd={{StartCommand}}", "--launchCmdArgs={{StartCommandArgs}}"
+      "{{ExecutablePath}}", "--delay", "20", "--launch-cmd", "{{StartCommand}}", "--launch-args", "{{StartCommandArgs}}"
     ]
   },
   "engine": "Unreal",
