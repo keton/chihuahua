@@ -17,12 +17,9 @@ jobs:
         dotnet-version: 8.0.x
     - name: Build
       run: dotnet publish -r win-x64 --sc -o ${{github.workspace}}/publish
-    - name: Compress release
-      run: |
-          7z a ${{github.workspace}}/chiuaua.zip ${{github.workspace}}/publish/*.*
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: chiuaua
-        path: ${{github.workspace}}/chiuaua.zip
+        path: ${{github.workspace}}/publish/*.*
         if-no-files-found: error
