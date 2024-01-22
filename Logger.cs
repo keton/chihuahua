@@ -8,7 +8,7 @@ namespace chiuaua {
         public sealed class ErrorSpinner : Spinner {
             public override TimeSpan Interval => TimeSpan.FromMilliseconds(250);
             public override bool IsUnicode => false;
-            public override IReadOnlyList<string> Frames => [" E", "ER", "RR", "RO", "OR", "R "];
+            public override IReadOnlyList<string> Frames => ["  E", " ER", "ERR", "RRO", "OR ", "R  "];
         }
 
         public static void Log(string prefix, string message) {

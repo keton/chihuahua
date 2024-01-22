@@ -53,7 +53,7 @@ internal static class Helpers {
             }
 
         } catch (Exception e) {
-            ExitWithMessage("Error while downloading: " + e.Message);
+            ExitWithMessage("Error while downloading: [dim]" + e.Message + "[/]");
         }
     }
 
@@ -142,7 +142,7 @@ internal static class Helpers {
 
     public static void InjectDll(int processId, string dllName) {
         if (!Injector.InjectDll(processId, dllName)) {
-            ExitWithMessage("Failed to inject: " + dllName);
+            ExitWithMessage("Failed to inject: [dim]" + dllName + "[/]");
         }
     }
 
@@ -163,7 +163,7 @@ internal static class Helpers {
                 Logger.Warn("Failed to nullify VR plugins.");
             }
         } else {
-            ExitWithMessage("Failed to inject: UEVRPluginNullifier.dll");
+            ExitWithMessage("Failed to inject: [dim]UEVRPluginNullifier.dll[/]");
         }
     }
 
@@ -176,9 +176,9 @@ internal static class Helpers {
             if (Directory.Exists(pluginDir)) {
                 try {
                     Directory.Delete(pluginDir, true);
-                    Logger.Debug("Removed plugin: " + pluginDir);
+                    Logger.Debug("Removed plugin: [dim white]" + pluginDir + "[/]");
                 } catch (Exception e) {
-                    Logger.Warn("Failed to remove plugin " + pluginDir + "\nException: " + e.Message);
+                    Logger.Warn("Failed to remove plugin [dim]" + pluginDir + "[/]. Exception: [dim]" + e.Message + "[/]");
                 }
             }
         }

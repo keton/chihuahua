@@ -70,7 +70,7 @@ internal class Chiuaua {
                                     AnsiConsole.MarkupLine("Chiuaua is a good dogo!");
                                     AnsiConsole.Write(new Padder(new Markup("It will take care of downloading necessary .dlls, removing pesky VR plugins and streamline whole injection process."
                                                           + "\n\nIn case of any error console window with explanation will wait for you when you exit your game."
-                                                          + "If main game process exits it will clean up the leftovers and terminate. So no window afterwards is a good sign."
+                                                          + "If main game process exits it will clean up the leftovers and terminate. [underline]No window afterwards is a good sign.[/]"
                                                           + "\n\nClosing console window after injection will force close the game for those stubborn cases that fail to exit."
                                                           )).Padding(2, 0));
                                 })
@@ -126,7 +126,7 @@ internal class Chiuaua {
         Console.InputEncoding = Encoding.UTF8;
 
         if (ParseArgs(args) != 0) {
-            Helpers.ExitWithMessage("Error parsing commandline arguments. Check red message at the top.", 0);
+            Helpers.ExitWithMessage("Error parsing commandline arguments. Check red message at the top.", exitCode: 0);
         }
 
         return 0;
@@ -135,6 +135,7 @@ internal class Chiuaua {
     private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS, int waitForGameTimeoutS = 60) {
         var ownExePath = Path.GetDirectoryName(Environment.ProcessPath);
         if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
+
             Logger.Info("Attempting to download missing files...");
             await Helpers.DownloadUEVRAsync();
 
@@ -168,7 +169,7 @@ internal class Chiuaua {
                 });
 
                 Logger.Info($"Waiting for [dim]{Path.GetFileName(gameExe)}[/] to spawn");
-                ctx.Status("[green]Starting game...[/]");
+                ctx.Status("Launching game...");
 
                 if (await Helpers.WaitForGameProcessAsync(gameExe, waitForGameTimeoutS)) {
                     Logger.Debug("Game process found");
@@ -182,7 +183,6 @@ internal class Chiuaua {
                 }
 
                 Logger.Info($"Waiting [dim]{injectionDelayS}s[/] before injection.");
-
                 await Helpers.WaitBeforeInjectionAsync(ctx, injectionDelayS);
 
                 var mainGameProcess = Helpers.GetMainGameProces(gameExe);
