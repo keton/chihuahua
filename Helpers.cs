@@ -1,6 +1,9 @@
 ﻿using chiuaua;
+using GitHub;
+using GitHub.Client;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using Microsoft.Kiota.Abstractions.Authentication;
 using Spectre.Console;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -10,7 +13,6 @@ using System.IO.Compression;
 using System.Net.Http.Handlers;
 
 internal static class Helpers {
-    private static readonly string uevrDownloadURL = "https://github.com/praydog/UEVR/releases/latest/download/UEVR.zip";
 
     private static readonly string[] uevr_dlls = [
         "UEVRPluginNullifier.dll",
@@ -75,25 +77,25 @@ internal static class Helpers {
         return (readable / 1024).ToString("0.## ", CultureInfo.InvariantCulture) + suffix;
     }
 
-    public static async Task DownloadUEVRAsync() {
+    public static async Task<bool> DownloadUEVRAsync(string downloadURL, string tagName = "") {
         try {
+            Logger.Debug($"Downloading UEVR relase from: [dim white]{downloadURL}[/]");
 
-            var handler = new HttpClientHandler() { AllowAutoRedirect = true };
-            var ph = new ProgressMessageHandler(handler);
-
-            await AnsiConsole
+            return await AnsiConsole
                             .Progress()
-                            .Columns(new ProgressColumn[]
-                            {
-                                new TaskDescriptionColumn(),    // Task description
-                                new ProgressBarColumn(),        // Progress bar
-                                new PercentageColumn(),         // Percentage
-                                new RemainingTimeColumn(),      // Remaining time
-                                new SpinnerColumn(),            // Spinner
-                            })
+                            .Columns(
+                            [
+                                new TaskDescriptionColumn(),
+                                new ProgressBarColumn(),
+                                new PercentageColumn(),
+                                new RemainingTimeColumn(),
+                                new SpinnerColumn(),
+                            ])
                             .StartAsync(async ctx => {
+                                var handler = new HttpClientHandler() { AllowAutoRedirect = true };
+                                var ph = new ProgressMessageHandler(handler);
 
-                                var downloadTask = ctx.AddTask("Downloading UEVR files");
+                                var downloadTask = ctx.AddTask($"Downloading UEVR {tagName}");
 
                                 long lastBytesTransferred = 0;
 
@@ -108,29 +110,63 @@ internal static class Helpers {
                                 };
 
                                 using var client = new HttpClient(ph);
-                                using var s = await client.GetStreamAsync(uevrDownloadURL);
-
+                                using var s = await client.GetStreamAsync(downloadURL);
                                 using var stream = new MemoryStream();
                                 await s.CopyToAsync(stream);
                                 using var zipArchive = new ZipArchive(stream);
 
                                 downloadTask.StopTask();
 
-                                var unpackTask = ctx.AddTask("Unpacking UEVR files");
+                                var unpackTask = ctx.AddTask($"Unpacking UEVR {tagName}");
                                 unpackTask.MaxValue = uevr_dlls.Length;
 
-                                foreach (var entry in zipArchive.Entries) {
-                                    if (uevr_dlls.Contains(entry.Name)) {
-                                        entry.ExtractToFile(Path.Join(Path.GetDirectoryName(Environment.ProcessPath), entry.Name), true);
-                                        unpackTask.Increment(1);
-                                    }
+                                var filesToUnpack = zipArchive.Entries.Where(entry => uevr_dlls.Contains(entry.Name));
+                                if (filesToUnpack.Count() != uevr_dlls.Length) {
+                                    Logger.Error($"Some of required files are missing in the download. [dim]{downloadURL}[/] does not look like valid UEVR release.");
+                                    return false;
+                                }
+
+                                foreach (var entry in filesToUnpack) {
+                                    entry.ExtractToFile(Path.Join(Path.GetDirectoryName(Environment.ProcessPath), entry.Name), true);
+                                    unpackTask.Increment(1);
                                 }
 
                                 unpackTask.StopTask();
+                                return true;
                             });
 
         } catch (Exception e) {
-            ExitWithMessage("Error while downloading: [dim]" + e.Message + "[/]");
+            Logger.Error($"Got exception while downloading: [dim]{e.Message}[/]");
+            return false;
+        }
+    }
+
+    public static async Task<bool> CheckUEVRReleaseAsync() {
+        try {
+            var releases = await new GitHubClient(RequestAdapter.Create(new AnonymousAuthenticationProvider())).Repos["praydog"]["UEVR"].Releases.GetAsync();
+            if (releases == null) {
+                Logger.Error("Github responded with empty UEVR releases");
+                return false;
+            }
+            var latestRelease = releases.First();
+            if (latestRelease.Assets == null) {
+                Logger.Error("Latest UEVR release does not contain any assets");
+                return false;
+            }
+
+            Logger.Debug($"Latest version: {latestRelease.TagName}");
+
+            var uevrAssets = latestRelease.Assets.Where(asset => asset.Name == "UEVR.zip");
+
+            if (uevrAssets.Count() != 1) {
+                Logger.Error($"[dim]UEVR.zip[/] asset not found in UEVR release {latestRelease.TagName}. Download and unpack files manually.");
+                return false;
+            }
+
+            return await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
+        } catch (Exception e) {
+            Logger.Error($"Got exception while checking for UEVR releases: [dim]{e.Message}[/]");
+            return false;
         }
     }
 

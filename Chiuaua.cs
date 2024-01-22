@@ -137,7 +137,9 @@ internal class Chiuaua {
         if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
 
             Logger.Info("Attempting to download missing files...");
-            await Helpers.DownloadUEVRAsync();
+            if (await Helpers.CheckUEVRReleaseAsync() == false) {
+                Helpers.ExitWithMessage($"UEVR download failed.");
+            }
 
             if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
                 Helpers.ExitWithMessage($"Files still missing after download, you may want to add [dim]{ownExePath}[/] to your antivirus exceptions");
