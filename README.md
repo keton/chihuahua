@@ -61,6 +61,7 @@ Compared to injector bundled with [UEVR](https://www.patreon.com/praydog) Chihua
 * stays out of your way. In case of successful injection Chihuahua will exit just after the game does
 * is oriented around spawning new game process not attaching to an existing one
 * can act as a 'panic button' - closing Chihuahua's window will automatically force close the game and do the cleanup
+* does not need .Net framework installation to work
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -85,12 +86,12 @@ Other streaming software and HMDs may be compatible but that is currently untest
 
 #### Antivirus exception
 
-Make folder on your PC and add its location to your antivirus exceptions. The way [UEVR mod](https://github.com/praydog/UEVR) works triggers false positives with antivirus software. 
+Make a folder on your PC and add its location to your antivirus exceptions. The way [UEVR mod](https://github.com/praydog/UEVR) works triggers false positives with antivirus software. 
 It's up to you to decide if making an exception or pausing antivirus to play a game is ok. Feel free to review all source code here and in [UEVR repo](https://github.com/praydog/UEVR).
 
 #### Download Chihuahua
 
-Latest release is [here](https://github.com/keton/chihuahua/releases/latest/download/chihuahua.zip). You browser/antivirus may need some reassuring for the download to happen. Unpack contents to the folder you've added to antivirus exceptions.
+Latest release is [here](https://github.com/keton/chihuahua/releases/latest/download/chihuahua.zip). Your browser/antivirus may need some reassuring for the download to happen. Unpack contents to the folder you've added to antivirus exceptions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -105,9 +106,9 @@ _Chihuahua's window has been put on top of game for demonstration purposes only_
 1. use 'browse game files' option to open game installation folder and find game executable
 1. open folder you've unpacked chihuahua in another window next to it
 1. put on your headset and start Virtual Desktop session
-1. drag game executable with your mouse and drop it on top of chihuahua.exe
-1. your game should start
-1. after 10 seconds [UEVR mod](https://github.com/praydog/UEVR) will start and your headset movement will start affecting game camera. It's strongly suggested to click trough intro cinematics and get to the menu or load game before that happens. Some games don't like being injected on early boot.
+1. drag game executable and drop it on top of chihuahua.exe
+1. game should start
+1. after 10 seconds [UEVR mod](https://github.com/praydog/UEVR) will start and your headset movement will start affecting game camera. It's strongly suggested to click trough intro cinematics and get to the menu or load a save before that happens. Some games don't like being injected on early boot.
 1. if it worked - congratulations. Follow official [UEVR docs](https://praydog.github.io/uevr-docs/index.html) to get the most of the mod.
 1. if it did not - close the game, there should be a console window waiting with log that indicates what went wrong.
 1. in case of 'Fatal Error' message window on top of your game try again. UEVR is still in early stages, some crashes are expected.
@@ -124,9 +125,12 @@ chihuahua "c:\full\path\to\you\game\folder\game.exe" --delay 30
 * full path to game `.exe` in double quotes. You can get this from your launcher by going to game properties and clicking 'browse local files'.
 * `--delay <number of seconds>` - how long to wait between launching the game and starting UEVR injection process
 * `--launch-cmd <launcher URI>` - some Epic Store games don't behave well when launched directly from `.exe`. This parameter allows you to specify launcher specific URI on top. 
-Steam URIs look like this: `steam://rungameid/1730590`.
-Epic Store like this: `com.epicgames.launcher://apps/da36711940d4460da57d8d6ad67236a4%3Aa1afcdb1d2344232954be97d4b86b9a8%3Acfbbc006f3ee4ba0bfff3ffa46942f90?action=launch&silent=true`
-To figure out correct value make a game desktop shortcut in your launcher and look into shortcut properties.
+
+  Steam URIs look like this: `steam://rungameid/1730590`.
+
+  Epic Store like this: `com.epicgames.launcher://apps/da36711940d4460da57d8d6ad67236a4%3Aa1afcdb1d2344232954be97d4b86b9a8%3Acfbbc006f3ee4ba0bfff3ffa46942f90?action=launch&silent=true`
+
+  To figure out correct value make a game desktop shortcut in your launcher and check shortcut properties.
 * `--launch-args "arg1 arg2"` - you can pass arguments to `--launch-cmd` process and in case that is not specified to game itself.
 Common use case would be to add `--launch-args "-nohmd -dx11"` to help with game compatibility.
 
