@@ -392,4 +392,15 @@ internal static class Helpers {
 
         return null;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
+    public static void focusGameWindow(string gameExe) {
+        var mainGameProcess = Helpers.GetMainGameProcess(gameExe);
+        if (mainGameProcess == null) {
+            Logger.Warn($"Failed to find main game process for {gameExe}");
+            return;
+        }
+        SwitchToThisWindow(mainGameProcess.Id, true);
+    }
 }

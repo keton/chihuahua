@@ -183,6 +183,8 @@ internal class Chihuahua {
                     Helpers.ExitWithMessage(ctx, "Timed out while waiting for game process");
                 }
 
+                Helpers.focusGameWindow(gameExe);
+
                 ConsoleCtrlEventArgs.gameExe = gameExe;
                 if (SetConsoleCtrlHandler(ConsoleCloseHandler, true) == false) {
                     Helpers.ExitWithMessage(ctx, "Failed to attach console close handler.");
