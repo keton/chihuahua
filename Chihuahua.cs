@@ -191,7 +191,7 @@ internal class Chihuahua {
                 Logger.Info($"Waiting [dim]{injectionDelayS}s[/] before injection.");
                 await Helpers.WaitBeforeInjectionAsync(ctx, injectionDelayS);
 
-                var mainGameProcess = Helpers.GetMainGameProces(gameExe);
+                var mainGameProcess = Helpers.GetMainGameProcess(gameExe);
                 if (mainGameProcess == null) {
                     Helpers.ExitWithMessage(ctx, $"[dim]{Path.GetFileName(gameExe)}[/] exited before it could be injected.");
                 }
@@ -207,10 +207,10 @@ internal class Chihuahua {
                     await Task.Delay(100);
                 }
 
-                Logger.Info("Game has exitted.");
+                Logger.Info("Game has exited.");
                 ctx.Status("Cleaning up before exit...");
 
-                if (Helpers.GetGameProceses(gameExe).Length > 0) {
+                if (Helpers.GetGameProcesses(gameExe).Length > 0) {
                     Logger.Debug("Leftover game process detected. Terminating...");
                     Helpers.TryCloseGame(gameExe);
                 }
