@@ -16,10 +16,10 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Build
-      run: dotnet publish -r win-x64 --sc -o ${{github.workspace}}/publish
+      run: dotnet publish -r win-x64 --sc
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: chihuahua
-        path: ${{github.workspace}}/publish/*.*
+        path: ${{github.workspace}}/bin/Release/net8.0/win-x64/publish/*.*
         if-no-files-found: error
