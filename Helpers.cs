@@ -364,14 +364,23 @@ internal static class Helpers {
 
     public static bool IsUnrealExecutable(string gameExe) {
         var ueSuffixes = ImmutableArray.Create("-WinGDK-Shipping", "-Win64-Shipping");
+        var uePathSuffixes = ImmutableArray.Create("\\Binaries\\Win64", "\\Binaries\\WinGDK");
 
-        return ueSuffixes.Any(elem => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem));
+        return ueSuffixes.Any(elem => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem))
+                || uePathSuffixes.Any(elem => (Path.GetDirectoryName(gameExe) ?? "").EndsWith(elem));
     }
 
     public static string? TryFindMainExecutable(string gameExe) {
         if (IsUnrealExecutable(gameExe)) return gameExe;
 
-        var mainExeGlobs = ImmutableArray.Create("*\\Binaries\\Win64\\*-Win64-Shipping.exe", "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe");
+        var exeBaseName = Path.GetFileNameWithoutExtension(gameExe);
+
+        var mainExeGlobs = ImmutableArray.Create(
+                                "*\\Binaries\\Win64\\*-Win64-Shipping.exe",
+                                "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe",
+                                $"*\\Binaries\\Win64\\{exeBaseName}.exe",
+                                $"*\\Binaries\\WinGDK\\{exeBaseName}.exe"
+        );
 
         var matcher = new Matcher();
         matcher.AddIncludePatterns(mainExeGlobs);
