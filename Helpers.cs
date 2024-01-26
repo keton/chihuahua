@@ -79,7 +79,7 @@ internal static class Helpers {
 
     public static async Task<bool> DownloadUEVRAsync(string downloadURL, string tagName = "") {
         try {
-            Logger.Debug($"Downloading UEVR relase from: [dim white]{downloadURL}[/]");
+            Logger.Debug($"Downloading UEVR release from: [dim white]{downloadURL}[/]");
 
             return await AnsiConsole
                             .Progress()
@@ -185,13 +185,13 @@ internal static class Helpers {
                     return false;
                 }
 
-                var downladSuceeded = await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
+                var downloadSucceeded = await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
 
-                if (downladSuceeded) {
+                if (downloadSucceeded) {
                     File.WriteAllText(uevrVersionPath, latestRelease.TagName + "\n");
                 }
 
-                return downladSuceeded;
+                return downloadSucceeded;
             }
 
             Logger.Debug("Skipping UEVR update");
@@ -258,14 +258,14 @@ internal static class Helpers {
     }
 
     // whole process group
-    public static Process[] GetGameProceses(string gameExe) {
+    public static Process[] GetGameProcesses(string gameExe) {
         var processName = Path.GetFileNameWithoutExtension(gameExe);
 
         return Process.GetProcessesByName(processName);
     }
 
     // main game process
-    public static Process? GetMainGameProces(string gameExe) {
+    public static Process? GetMainGameProcess(string gameExe) {
 
         var processName = Path.GetFileNameWithoutExtension(gameExe);
 
@@ -330,7 +330,7 @@ internal static class Helpers {
     }
 
     public static void TryCloseGame(string gameExe) {
-        foreach (var gameProcess in GetGameProceses(gameExe)) {
+        foreach (var gameProcess in GetGameProcesses(gameExe)) {
             try {
                 gameProcess.Kill();
             } catch (Exception) {
@@ -343,7 +343,7 @@ internal static class Helpers {
 
         Process? gameProcess = null;
 
-        while ((elapsed < timeoutS * 1000) && (gameProcess = GetMainGameProces(gameExe)) == null) {
+        while ((elapsed < timeoutS * 1000) && (gameProcess = GetMainGameProcess(gameExe)) == null) {
             elapsed += 100;
             await Task.Delay(100);
         }
@@ -364,14 +364,23 @@ internal static class Helpers {
 
     public static bool IsUnrealExecutable(string gameExe) {
         var ueSuffixes = ImmutableArray.Create("-WinGDK-Shipping", "-Win64-Shipping");
+        var uePathSuffixes = ImmutableArray.Create("\\Binaries\\Win64", "\\Binaries\\WinGDK");
 
-        return ueSuffixes.Any(elem => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem));
+        return ueSuffixes.Any(elem => Path.GetFileNameWithoutExtension(gameExe).EndsWith(elem))
+                || uePathSuffixes.Any(elem => (Path.GetDirectoryName(gameExe) ?? "").EndsWith(elem));
     }
 
     public static string? TryFindMainExecutable(string gameExe) {
         if (IsUnrealExecutable(gameExe)) return gameExe;
 
-        var mainExeGlobs = ImmutableArray.Create("*\\Binaries\\Win64\\*-Win64-Shipping.exe", "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe");
+        var exeBaseName = Path.GetFileNameWithoutExtension(gameExe);
+
+        var mainExeGlobs = ImmutableArray.Create(
+                                "*\\Binaries\\Win64\\*-Win64-Shipping.exe",
+                                "*\\Binaries\\WinGDK\\*-WinGDK-Shipping.exe",
+                                $"*\\Binaries\\Win64\\{exeBaseName}.exe",
+                                $"*\\Binaries\\WinGDK\\{exeBaseName}.exe"
+        );
 
         var matcher = new Matcher();
         matcher.AddIncludePatterns(mainExeGlobs);
@@ -382,5 +391,16 @@ internal static class Helpers {
         }
 
         return null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
+    public static void focusGameWindow(string gameExe) {
+        var mainGameProcess = Helpers.GetMainGameProcess(gameExe);
+        if (mainGameProcess == null) {
+            Logger.Warn($"Failed to find main game process for {gameExe}");
+            return;
+        }
+        SwitchToThisWindow(mainGameProcess.Id, true);
     }
 }
