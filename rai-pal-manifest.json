@@ -4,9 +4,7 @@
     "path": "chihuahua.exe",
     "args": [
       "{{ExecutablePath}}",
-      "--delay", "20",
-      "--launch-cmd", "{{StartCommand}}",
-      "--launch-args", "{{StartCommandArgs}}"
+      "--delay", "30"
     ]
   },
   "engine": "Unreal",
