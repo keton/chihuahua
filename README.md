@@ -55,7 +55,7 @@ Chihuahua aims to solve this, making whole process as easy as dragging and dropp
 Compared to injector bundled with [UEVR](https://www.patreon.com/praydog) Chihuahua:
 * makes all the decisions for the user
 * automatically downloads and keeps UEVR up to date
-* deals with certain things that can make injection fail (choosing right executable, disabling unwanted UE plugins, adding pre injection delay)
+* deals with certain things that can make injection fail (choosing right executable, selecting correct VR runtime, disabling unwanted UE plugins, adding pre injection delay)
 * cleans up leftover processes when game exits. This allows cloud saves to upload properly
 * aims to provide easy to understand message about what's going on and especially what went wrong
 * stays out of your way. In case of successful injection Chihuahua will exit just after the game does
@@ -78,9 +78,11 @@ Compared to injector bundled with [UEVR](https://www.patreon.com/praydog) Chihua
 This is an example of how you may start your first UEVR game. 
 
 For highest chance of success pick one of 'works perfectly' titles with good user opinion. To check all that take a look at [Flat2VR Discord](https://discord.com/invite/ZFSCSDe), `#ue-games` channel.
-Also keep in mind that we're going to use VR technology called OpenXR which means chihuahua type of injection will work best on Quest 2/3/Pro and Pico 4 over Virtual Desktop.
+Chihuahua was tested on Oculus Quest 3 and Pico 4 over Virtual Desktop, Pico Connect, Air Link and Steam Link. It it expected to work on Quest 2 and Quest Pro as well.
 
-Other streaming software and HMDs may be compatible but that is currently untested. In such case you may want to try injector bundled with [UEVR](https://github.com/praydog/UEVR).
+Other streaming software and HMDs may be compatible but that is currently untested. In such case you may want to specify VR runtime (OpenVR/OpenXR) using `--runtime` parameter. Feel free to try both. If that works please open an [Issue](https://github.com/keton/chihuahua/issues) and let me know, I'll add HMD + runtime combination to the auto detection process.
+
+In case above fails you can try injector bundled with [UEVR](https://github.com/praydog/UEVR).
 
 ### Prerequisites
 
@@ -133,13 +135,16 @@ chihuahua "c:\full\path\to\you\game\folder\game.exe" --delay 30
   To figure out correct value make a game desktop shortcut in your launcher and check shortcut properties.
 * `--launch-args "arg1 arg2"` - you can pass arguments to `--launch-cmd` process and in case that is not specified to game itself.
 Common use case would be to add `--launch-args "-nohmd -dx11"` to help with game compatibility.
+* `--runtime <OpenVR|OpenXR>` - override runtime autodetection, useful if process fails. 
+`OpenVR` requires SteamVR to be installed. 
+`OpenXR` requires OpenXR runtime to be set correctly in your HMD software (probably it is unless you have multiple HMDs/VR streaming apps).
 
 ### Game launch shortcut
 
 Keep in mind that you can make a desktop shortcut to `chihuahua.exe`, go to shortcut properties 
 and add full path to game executable in double quotes as a parameter. This will make shortcut to launch and inject the game.
 
-### Rai Pal integration (in progress)
+### Rai Pal integration
 
 [Rai Pal](https://github.com/raicuparta/rai-pal) is an amazing game launcher by [Raicuparta](https://raicuparta.com/).
 
