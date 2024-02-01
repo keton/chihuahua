@@ -78,7 +78,7 @@ Compared to injector bundled with [UEVR](https://www.patreon.com/praydog) Chihua
 This is an example of how you may start your first UEVR game. 
 
 For highest chance of success pick one of 'works perfectly' titles with good user opinion. To check all that take a look at [Flat2VR Discord](https://discord.com/invite/ZFSCSDe), `#ue-games` channel.
-Chihuahua was tested on Oculus Quest 3 and Pico 4 over Virtual Desktop, Pico Connect, Air Link and Steam Link. It it expected to work on Quest 2 and Quest Pro as well.
+Chihuahua was tested on Oculus Quest 3 and Pico 4 over Virtual Desktop, Pico Streaming Assistant, Pico Connect, Air Link and Steam Link. It is expected to work on Quest 2 and Quest Pro as well.
 
 Other streaming software and HMDs may be compatible but that is currently untested. In such case you may want to specify VR runtime (OpenVR/OpenXR) using `--runtime` parameter. Feel free to try both. If that works please open an [Issue](https://github.com/keton/chihuahua/issues) and let me know, I'll add HMD + runtime combination to the auto detection process.
 
