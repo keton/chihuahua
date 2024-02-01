@@ -428,6 +428,10 @@ namespace chihuahua {
             return IsProcessRunning("OculusDash");
         }
 
+        private static bool IsPicoConnectRunning() {
+            return IsProcessRunning("PICO Connect") || IsProcessRunning("Streaming Assistant");
+        }
+
 
         public static RuntimeType DetectRuntimeType() {
             if (IsVirtualDesktopRunning()) {
@@ -442,6 +446,11 @@ namespace chihuahua {
 
             if (IsSteamVRRunning()) {
                 Logger.Info("SteamVR session detected. Using OpenVR.");
+                return RuntimeType.OpenVR;
+            }
+
+            if (IsPicoConnectRunning()) {
+                Logger.Info("Pico Connect session detected. Using OpenVR.");
                 return RuntimeType.OpenVR;
             }
 
