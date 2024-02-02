@@ -34,6 +34,24 @@ namespace chihuahua {
             "Oculus"
         ];
 
+        private enum VRSoftware {
+            VirtualDesktop,
+            Oculus,
+            Pico,
+            SteamVR,
+            Unknown
+        }
+
+        private enum OpenXRRuntime {
+            VirtualDesktop,
+            Oculus,
+            Steam,
+            Varjo,
+            ViveVR,
+            WMR,
+            Unknown
+        }
+
         public static bool CheckDLLsPresent(string exePath) {
 
             bool ret = true;
@@ -416,42 +434,146 @@ namespace chihuahua {
             return Process.GetProcessesByName(processName).Length > 0;
         }
 
-        private static bool IsVirtualDesktopRunning() {
-            return IsProcessRunning("VirtualDesktop.Server");
+        private static VRSoftware DetectVRSoftware() {
+            if (IsProcessRunning("VirtualDesktop.Server")) {
+                return VRSoftware.VirtualDesktop;
+            }
+
+            if (IsProcessRunning("OculusDash")) {
+                return VRSoftware.Oculus;
+            }
+
+            if (IsProcessRunning("vrcompositor") || IsProcessRunning("vrserver")) {
+                return VRSoftware.SteamVR;
+            }
+
+            if (IsProcessRunning("PICO Connect") || IsProcessRunning("Streaming Assistant")) {
+                return VRSoftware.Pico;
+            }
+
+            return VRSoftware.Unknown;
         }
 
-        private static bool IsSteamVRRunning() {
-            return IsProcessRunning("vrcompositor") || IsProcessRunning("vrserver");
-        }
+        private static OpenXRRuntime DetectOpenXRRuntime() {
+            try {
+                // see https://registry.khronos.org/OpenXR/specs/1.0/loader.html#runtime-discovery
+                const string openXRRegistryBase = "Software\\Khronos\\OpenXR";
 
-        private static bool IsOculusLinkRunning() {
-            return IsProcessRunning("OculusDash");
-        }
+                string? runtimePath = null;
 
-        private static bool IsPicoConnectRunning() {
-            return IsProcessRunning("PICO Connect") || IsProcessRunning("Streaming Assistant");
-        }
+#pragma warning disable CA1416 // Validate platform compatibility
 
+                // Keys are versioned for example 'Software\Khronos\OpenXR\1' for OpenXR 1.0, find the latest version
+                using var openXRRuntimesKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(openXRRegistryBase, false); // false == read only access
+                if (openXRRuntimesKey is not null) {
+                    var openXRVersions = openXRRuntimesKey?.GetSubKeyNames().Where(key => int.TryParse(key, out _)).Order();
+
+                    if (openXRVersions is not null && openXRVersions.Any()) {
+                        var latestOpenXRRuntimeVersionKey = openXRRegistryBase + "\\" + openXRVersions.Last();
+                        Logger.Debug($"Found OpenXR runtime registry path: {latestOpenXRRuntimeVersionKey}");
+
+                        using var runtimeRegKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(latestOpenXRRuntimeVersionKey, false);
+                        runtimePath = runtimeRegKey?.GetValue("ActiveRuntime") as string;
+                    }
+                }
+#pragma warning restore CA1416 // Validate platform compatibility
+
+                // see https://registry.khronos.org/OpenXR/specs/1.0/loader.html#overriding-the-default-runtime-usage
+                var runtimeEnvVar = Environment.GetEnvironmentVariable("XR_RUNTIME_JSON") ?? "";
+                if (runtimeEnvVar.Length > 0) {
+                    Logger.Debug($"OpenXR ActiveRuntime registry value:\"{runtimePath}\" overwritten with XR_RUNTIME_JSON contents:\"{runtimeEnvVar}\"");
+                    runtimePath = runtimeEnvVar;
+                }
+
+                if (string.IsNullOrWhiteSpace(runtimePath)) {
+                    Logger.Warn("OpenXR runtime path is empty");
+                    return OpenXRRuntime.Unknown;
+                }
+
+                var runtimeFileName = Path.GetFileName(runtimePath);
+                if (runtimeFileName.StartsWith("steamxr", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.Steam;
+                }
+
+                if (runtimeFileName.StartsWith("virtualdesktop", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.VirtualDesktop;
+                }
+
+                if (runtimeFileName.StartsWith("oculus", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.Oculus;
+                }
+
+                if (runtimeFileName.StartsWith("varjo", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.Varjo;
+                }
+
+                if (runtimeFileName.StartsWith("vive", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.ViveVR;
+                }
+
+                if (runtimeFileName.StartsWith("mixedrealityruntime", StringComparison.CurrentCultureIgnoreCase)) {
+                    return OpenXRRuntime.WMR;
+                }
+
+                Logger.Warn($"DetectOpenXRRuntime() unknown runtime definition: {runtimePath}");
+
+            } catch (Exception ex) {
+                Logger.Warn($"Got exception when trying to read OpenXR runtime from Registry: {ex.Message}");
+            }
+
+            Logger.Debug("DetectOpenXRRuntime() No known OpenXR runtime detected");
+            return OpenXRRuntime.Unknown;
+        }
 
         public static RuntimeType DetectRuntimeType() {
-            if (IsVirtualDesktopRunning()) {
-                Logger.Info("Virtual Desktop session detected. Using OpenXR.");
-                return RuntimeType.OpenXR;
-            }
 
-            if (IsOculusLinkRunning()) {
-                Logger.Info("Oculus Link/Airlink session detected. Using OpenVR.");
-                return RuntimeType.OpenVR;
-            }
+            var vrSoftware = DetectVRSoftware();
+            var openXRRuntime = DetectOpenXRRuntime();
 
-            if (IsSteamVRRunning()) {
-                Logger.Info("SteamVR session detected. Using OpenVR.");
-                return RuntimeType.OpenVR;
-            }
+            Logger.Debug($"DetectRuntimeType() Detected VR software: {vrSoftware}");
+            Logger.Debug($"DetectRuntimeType() Detected OpenXR runtime: {openXRRuntime}");
 
-            if (IsPicoConnectRunning()) {
-                Logger.Info("Pico Connect session detected. Using OpenVR.");
-                return RuntimeType.OpenVR;
+            switch (vrSoftware) {
+                case VRSoftware.VirtualDesktop:
+                    if (openXRRuntime is not OpenXRRuntime.Steam and not OpenXRRuntime.VirtualDesktop) {
+                        Logger.Warn($"Virtual Desktop detected but unsupported OpenXR runtime is active: {openXRRuntime}. Falling back to OpenVR API. This will cause problems.");
+                        return RuntimeType.OpenVR;
+                    }
+                    if (openXRRuntime is not OpenXRRuntime.VirtualDesktop) {
+                        Logger.Info("Virtual Desktop detected but VDXR is not active, please fix it in VD streamer options.");
+                    }
+                    return RuntimeType.OpenXR;
+
+                case VRSoftware.Oculus:
+                    if (openXRRuntime == OpenXRRuntime.Oculus) {
+                        return RuntimeType.OpenXR;
+                    }
+                    Logger.Warn($"Oculus Link detected but {openXRRuntime} is active OpenXR runtime. Falling back to OpenVR API.");
+                    return RuntimeType.OpenVR;
+
+                case VRSoftware.SteamVR:
+                    if (openXRRuntime == OpenXRRuntime.Steam) {
+                        return RuntimeType.OpenXR;
+                    }
+                    Logger.Warn($"SteamVR detected but {openXRRuntime} is active OpenXR runtime. Falling back to OpenVR API.");
+                    return RuntimeType.OpenVR;
+
+                case VRSoftware.Pico:
+                    if (openXRRuntime == OpenXRRuntime.Steam) {
+                        return RuntimeType.OpenXR;
+                    }
+                    Logger.Warn($"Pico Connect detected but {openXRRuntime} is active OpenXR runtime. Please select SteamVR as OpenXR runtime. Falling back to OpenVR API.");
+                    return RuntimeType.OpenVR;
+
+                case VRSoftware.Unknown:
+                    if (openXRRuntime != OpenXRRuntime.Unknown) {
+                        Logger.Warn($"Last resort. No known VR software detected but OpenXR: \"{openXRRuntime}\" was detected. [yellow bold]Expect problems.[/]");
+                        return RuntimeType.OpenXR;
+                    }
+                    break;
+
+                default:
+                    break;
             }
 
             Logger.Warn("No known VR streamer detected. Is your VR session running?");
