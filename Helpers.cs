@@ -409,7 +409,7 @@ namespace chihuahua {
                 Logger.Warn($"Failed to find main game process for {gameExe}");
                 return;
             }
-            SwitchToThisWindow(mainGameProcess.Id, true);
+            SwitchToThisWindow(mainGameProcess.MainWindowHandle, true);
         }
 
         private static bool IsProcessRunning(string processName) {

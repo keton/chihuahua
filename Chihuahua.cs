@@ -218,6 +218,8 @@ namespace chihuahua {
                     Logger.Info("Injection done, close this window to kill game process.");
                     ctx.Status("[green]Game injected and running, close this window to kill game process...[/]");
 
+                    Helpers.focusGameWindow(gameExe);
+
                     while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
                         await Task.Delay(100);
                     }
