@@ -112,10 +112,10 @@ namespace chihuahua {
                                 .Columns(
                                 [
                                     new TaskDescriptionColumn(),
-                                new ProgressBarColumn(),
-                                new PercentageColumn(),
-                                new RemainingTimeColumn(),
-                                new SpinnerColumn(),
+                                    new ProgressBarColumn(),
+                                    new PercentageColumn(),
+                                    new RemainingTimeColumn(),
+                                    new SpinnerColumn(),
                                 ])
                                 .StartAsync(async ctx => {
                                     var handler = new HttpClientHandler() { AllowAutoRedirect = true };
@@ -422,7 +422,7 @@ namespace chihuahua {
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
         public static void focusGameWindow(string gameExe) {
-            var mainGameProcess = Helpers.GetMainGameProcess(gameExe);
+            var mainGameProcess = GetMainGameProcess(gameExe);
             if (mainGameProcess == null) {
                 Logger.Warn($"Failed to find main game process for {gameExe}");
                 return;
