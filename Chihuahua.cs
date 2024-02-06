@@ -51,15 +51,17 @@ namespace chihuahua {
             var gameExeArgument = new Argument<FileInfo>(name: "full path to game.exe", description: "Unreal Engine executable to spawn and inject");
             var verboseOption = new Option<bool>(aliases: ["--verbose", "-v"], description: "enable debug output");
             var runtimeOption = new Option<RuntimeType>(name: "--runtime", getDefaultValue: () => RuntimeType.Auto, description: "VR runtime to use");
+            var uevrBuildOption = new Option<UEVRBuild>(name: "--uevr-build", getDefaultValue: () => UEVRBuild.Release, description: "UEVR build to use for auto updates");
 
             var rootCommand = new RootCommand("No frills UEVR injector. Chihuahua goes where bigger dogs won't.") {
-            delayOption,
-            launchCmdOption,
-            launchCmdArgsOption,
-            gameExeArgument,
-            verboseOption,
-            runtimeOption,
-        };
+                delayOption,
+                launchCmdOption,
+                launchCmdArgsOption,
+                gameExeArgument,
+                verboseOption,
+                runtimeOption,
+                uevrBuildOption,
+            };
 
             var parser = new CommandLineBuilder(rootCommand)
                             .UseDefaults()
@@ -103,21 +105,29 @@ namespace chihuahua {
                             })
                             .Build();
 
-            rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs, verbose, runtime) => {
+            rootCommand.SetHandler(async (gameExe, delay, launchCmd, launchCmdArgs, verbose, runtime, uevrBuild) => {
                 Logger.verbose = verbose;
 
                 if (!gameExe.Exists) {
                     Helpers.ExitWithMessage($"Game executable: \"{gameExe.FullName}\" not found.");
                 }
 
-                await RunAndInject(gameExe.FullName, launchCmd, launchCmdArgs, delay, runtime);
+                await RunAndInject(new LaunchOptions {
+                    gameExe = gameExe.FullName,
+                    launchCmd = launchCmd,
+                    launchCmdArgs = launchCmdArgs,
+                    injectionDelayS = delay,
+                    runtime = runtime,
+                    uevrBuild = uevrBuild
+                });
             },
             gameExeArgument,
             delayOption,
             launchCmdOption,
             launchCmdArgsOption,
             verboseOption,
-            runtimeOption
+            runtimeOption,
+            uevrBuildOption
             );
 
             return parser.Invoke(args);
@@ -136,13 +146,12 @@ namespace chihuahua {
             return 0;
         }
 
-        private static async Task RunAndInject(string gameExe, string? launchCmd, string? launchCmdArgs, int injectionDelayS,
-                                                RuntimeType runtime = RuntimeType.Auto, int waitForGameTimeoutS = 60) {
+        private static async Task RunAndInject(LaunchOptions options, int waitForGameTimeoutS = 60) {
             var ownExePath = Path.GetDirectoryName(Environment.ProcessPath);
             if (!Helpers.CheckDLLsPresent(ownExePath ?? "")) {
 
                 Logger.Info("Attempting to download missing files...");
-                if (await Helpers.UpdateUEVRAsync(forceDownload: true) == false) {
+                if (await Helpers.UpdateUEVRAsync(forceDownload: true, uevrBuild: options.uevrBuild) == false) {
                     Helpers.ExitWithMessage($"UEVR download failed.");
                 }
 
@@ -150,28 +159,28 @@ namespace chihuahua {
                     Helpers.ExitWithMessage($"Files still missing after download, you may want to add [dim]{ownExePath}[/] to your antivirus exceptions");
                 }
             } else {
-                if (await Helpers.UpdateUEVRAsync() == false) {
+                if (await Helpers.UpdateUEVRAsync(uevrBuild: options.uevrBuild) == false) {
                     Logger.Warn("Failed to check UEVR updates");
                 }
             }
 
-            var mainGameExe = Helpers.TryFindMainExecutable(gameExe);
+            var mainGameExe = Helpers.TryFindMainExecutable(options.gameExe);
             if (mainGameExe == null) {
-                Helpers.ExitWithMessage($"[dim]{Path.GetFileName(gameExe)}[/] does not look like UE game executable and no suitable candidate was found.");
+                Helpers.ExitWithMessage($"[dim]{Path.GetFileName(options.gameExe)}[/] does not look like UE game executable and no suitable candidate was found.");
             }
 
-            if (mainGameExe != gameExe) {
-                Logger.Debug($"Detected [dim white]{mainGameExe}[/] as main executable for [dim white]{gameExe}[/]");
+            if (mainGameExe != options.gameExe) {
+                Logger.Debug($"Detected [dim white]{mainGameExe}[/] as main executable for [dim white]{options.gameExe}[/]");
             }
 
-            gameExe = mainGameExe;
+            options.gameExe = mainGameExe;
 
-            Helpers.RemoveUnwantedPlugins(gameExe);
+            Helpers.RemoveUnwantedPlugins(options.gameExe);
 
-            if (runtime == RuntimeType.Auto) {
-                runtime = Helpers.DetectRuntimeType();
+            if (options.runtime == RuntimeType.Auto) {
+                options.runtime = Helpers.DetectRuntimeType();
 
-                if (runtime == RuntimeType.Auto) {
+                if (options.runtime == RuntimeType.Auto) {
                     Helpers.ExitWithMessage("Failed to detect VR runtime type. You can set it manually with --runtime command line parameter.");
                 }
             }
@@ -182,43 +191,43 @@ namespace chihuahua {
                 .StartAsync("About to start game...", async ctx => {
 
                     Process.Start(new ProcessStartInfo {
-                        FileName = launchCmd ?? gameExe,
-                        Arguments = launchCmdArgs ?? "",
+                        FileName = options.launchCmd ?? options.gameExe,
+                        Arguments = options.launchCmdArgs ?? "",
                         UseShellExecute = true,
                     });
 
-                    Logger.Info($"Waiting for [dim]{Path.GetFileName(gameExe)}[/] to spawn");
+                    Logger.Info($"Waiting for [dim]{Path.GetFileName(options.gameExe)}[/] to spawn");
                     ctx.Status("Launching game...");
 
-                    if (await Helpers.WaitForGameProcessAsync(gameExe, waitForGameTimeoutS)) {
+                    if (await Helpers.WaitForGameProcessAsync(options.gameExe, waitForGameTimeoutS)) {
                         Logger.Debug("Game process found");
                     } else {
                         Helpers.ExitWithMessage(ctx, "Timed out while waiting for game process");
                     }
 
-                    Helpers.focusGameWindow(gameExe);
+                    Helpers.focusGameWindow(options.gameExe);
 
-                    ConsoleCtrlEventArgs.gameExe = gameExe;
+                    ConsoleCtrlEventArgs.gameExe = options.gameExe;
                     if (SetConsoleCtrlHandler(ConsoleCloseHandler, true) == false) {
                         Helpers.ExitWithMessage(ctx, "Failed to attach console close handler.");
                     }
 
-                    Logger.Info($"Waiting [dim]{injectionDelayS}s[/] before injection.");
-                    await Helpers.WaitBeforeInjectionAsync(ctx, injectionDelayS);
+                    Logger.Info($"Waiting [dim]{options.injectionDelayS}s[/] before injection.");
+                    await Helpers.WaitBeforeInjectionAsync(ctx, options.injectionDelayS);
 
-                    var mainGameProcess = Helpers.GetMainGameProcess(gameExe);
+                    var mainGameProcess = Helpers.GetMainGameProcess(options.gameExe);
                     if (mainGameProcess == null) {
-                        Helpers.ExitWithMessage(ctx, $"[dim]{Path.GetFileName(gameExe)}[/] exited before it could be injected.");
+                        Helpers.ExitWithMessage(ctx, $"[dim]{Path.GetFileName(options.gameExe)}[/] exited before it could be injected.");
                     }
 
                     Helpers.NullifyPlugins(mainGameProcess.Id);
-                    Helpers.InjectRuntime(mainGameProcess.Id, runtime);
+                    Helpers.InjectRuntime(mainGameProcess.Id, options.runtime);
                     Helpers.InjectDll(mainGameProcess.Id, "UEVRBackend.dll");
 
                     Logger.Info("Injection done, close this window to kill game process.");
                     ctx.Status("[green]Game injected and running, close this window to kill game process...[/]");
 
-                    Helpers.focusGameWindow(gameExe);
+                    Helpers.focusGameWindow(options.gameExe);
 
                     while (Helpers.IsProcessRunning(mainGameProcess.Id)) {
                         await Task.Delay(100);
@@ -227,9 +236,9 @@ namespace chihuahua {
                     Logger.Info("Game has exited.");
                     ctx.Status("Cleaning up before exit...");
 
-                    if (Helpers.GetGameProcesses(gameExe).Length > 0) {
+                    if (Helpers.GetGameProcesses(options.gameExe).Length > 0) {
                         Logger.Debug("Leftover game process detected. Terminating...");
-                        Helpers.TryCloseGame(gameExe);
+                        Helpers.TryCloseGame(options.gameExe);
                     }
                 });
         }

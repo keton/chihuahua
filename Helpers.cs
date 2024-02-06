@@ -19,6 +19,20 @@ namespace chihuahua {
         Auto
     }
 
+    internal enum UEVRBuild {
+        Release,
+        Nightly
+    }
+
+    internal struct LaunchOptions {
+        public string gameExe;
+        public string? launchCmd;
+        public string? launchCmdArgs;
+        public int injectionDelayS;
+        public RuntimeType runtime;
+        public UEVRBuild uevrBuild;
+    };
+
     internal static class Helpers {
 
         private static readonly string[] uevr_dlls = [
@@ -103,7 +117,7 @@ namespace chihuahua {
             return (readable / 1024).ToString("0.## ", CultureInfo.InvariantCulture) + suffix;
         }
 
-        public static async Task<bool> DownloadUEVRAsync(string downloadURL, string tagName = "") {
+        public static async Task<bool> DownloadUEVRAsync(string downloadURL, string uevrRelease = "") {
             try {
                 Logger.Debug($"Downloading UEVR release from: [dim white]{downloadURL}[/]");
 
@@ -121,7 +135,7 @@ namespace chihuahua {
                                     var handler = new HttpClientHandler() { AllowAutoRedirect = true };
                                     var ph = new ProgressMessageHandler(handler);
 
-                                    var downloadTask = ctx.AddTask($"Downloading UEVR {tagName}");
+                                    var downloadTask = ctx.AddTask($"Downloading {uevrRelease}");
 
                                     long lastBytesTransferred = 0;
 
@@ -143,7 +157,7 @@ namespace chihuahua {
 
                                     downloadTask.StopTask();
 
-                                    var unpackTask = ctx.AddTask($"Unpacking UEVR {tagName}");
+                                    var unpackTask = ctx.AddTask($"Unpacking {uevrRelease}");
                                     unpackTask.MaxValue = uevr_dlls.Length;
 
                                     var filesToUnpack = zipArchive.Entries.Where(entry => uevr_dlls.Contains(entry.Name));
@@ -167,7 +181,7 @@ namespace chihuahua {
             }
         }
 
-        public static async Task<bool> UpdateUEVRAsync(bool forceDownload = false) {
+        public static async Task<bool> UpdateUEVRAsync(bool forceDownload = false, UEVRBuild uevrBuild = UEVRBuild.Release) {
             try {
                 var uevrVersionPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath), "uevr.version");
                 var currentVersion = "";
@@ -176,15 +190,22 @@ namespace chihuahua {
                     currentVersion = File.ReadAllLines(uevrVersionPath)[0].Trim().Replace("\n", "");
                 } catch (Exception) { }
 
-                var releases = await new GitHubClient(RequestAdapter.Create(new AnonymousAuthenticationProvider())).Repos["praydog"]["UEVR"].Releases.GetAsync();
+                var repoOwner = "praydog";
+                var repoName = "UEVR";
+
+                if (uevrBuild == UEVRBuild.Nightly) {
+                    repoName = "UEVR-nightly";
+                }
+
+                var releases = await new GitHubClient(RequestAdapter.Create(new AnonymousAuthenticationProvider())).Repos[repoOwner][repoName].Releases.GetAsync();
 
                 if (releases == null) {
-                    Logger.Error("Github responded with empty UEVR releases");
+                    Logger.Error($"{repoOwner}/{repoName} responded with empty UEVR releases");
                     return false;
                 }
                 var latestRelease = releases.First();
                 if (latestRelease.Assets == null) {
-                    Logger.Error("Latest UEVR release does not contain any assets");
+                    Logger.Error($"Latest {repoOwner}/{repoName} release does not contain any assets");
                     return false;
                 }
 
@@ -198,20 +219,23 @@ namespace chihuahua {
                     Logger.Debug("Forced update");
                 }
 
-                Logger.Debug($"Latest version: {latestRelease.TagName}");
+                Logger.Debug($"Latest {repoOwner}/{repoName} version: {latestRelease.TagName}");
 
                 // don't update if version file is missing. Allows manual unpacking UEVR to chihuahua directory
                 if (forceDownload || ((currentVersion != latestRelease.TagName) && (currentVersion != ""))) {
-                    Logger.Info($"Updating UEVR to {latestRelease.TagName}");
+                    Logger.Info($"Updating {repoOwner}/{repoName} to {latestRelease.TagName}");
 
-                    var uevrAssets = latestRelease.Assets.Where(asset => asset.Name == "UEVR.zip");
+                    // nightly release artifact is named in lower case
+                    var uevrAssets = latestRelease.Assets.Where(asset => String.Equals(asset.Name, "UEVR.zip", StringComparison.OrdinalIgnoreCase));
 
                     if (uevrAssets.Count() != 1) {
-                        Logger.Error($"[dim]UEVR.zip[/] asset not found in UEVR release {latestRelease.TagName}. Download and unpack files manually.");
+                        Logger.Error($"[dim]UEVR.zip[/] asset not found in {repoOwner}/{repoName} release {latestRelease.TagName}. Download and unpack files manually.");
                         return false;
                     }
 
-                    var downloadSucceeded = await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", latestRelease.TagName ?? "");
+                    var releaseName = string.Format("{0}/{1} {2}", repoOwner, repoName, (uevrBuild == UEVRBuild.Release) ? latestRelease.TagName : latestRelease.TagName?[^6..]);
+
+                    var downloadSucceeded = await DownloadUEVRAsync(uevrAssets.First().BrowserDownloadUrl ?? "", releaseName);
 
                     if (downloadSucceeded) {
                         File.WriteAllText(uevrVersionPath, latestRelease.TagName + "\n");
