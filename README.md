@@ -54,7 +54,7 @@ Chihuahua aims to solve this, making whole process as easy as dragging and dropp
 
 Compared to injector bundled with [UEVR](https://www.patreon.com/praydog) Chihuahua:
 * makes all the decisions for the user
-* automatically downloads and keeps UEVR up to date
+* automatically downloads and keeps UEVR up to date (now with Nightly build support)
 * deals with certain things that can make injection fail (choosing right executable, selecting correct VR runtime, disabling unwanted UE plugins, adding pre injection delay)
 * cleans up leftover processes when game exits. This allows cloud saves to upload properly
 * aims to provide easy to understand message about what's going on and especially what went wrong
@@ -138,6 +138,7 @@ Common use case would be to add `--launch-args "-nohmd -dx11"` to help with game
 * `--runtime <OpenVR|OpenXR>` - override runtime autodetection, useful if process fails. 
 `OpenVR` requires SteamVR to be installed. 
 `OpenXR` requires OpenXR runtime to be set correctly in your HMD software (probably it is unless you have multiple HMDs/VR streaming apps).
+* `--uevr-build <Nightly|Release>` - override UEVR version for auto updater. Release builds are used by default. Nightly builds may be less stable but contain the latest features.
 
 ### Game launch shortcut
 
