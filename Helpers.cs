@@ -607,9 +607,11 @@ namespace chihuahua {
         public static void InjectRuntime(int mainGameProcessId, RuntimeType runtime = RuntimeType.OpenXR) {
             switch (runtime) {
                 case RuntimeType.OpenXR:
+                    Logger.Info("Using [dim]OpenXR[/] runtime");
                     InjectDll(mainGameProcessId, "openxr_loader.dll");
                     break;
                 case RuntimeType.OpenVR:
+                    Logger.Info("Using [dim]OpenVR[/] runtime");
                     InjectDll(mainGameProcessId, "openvr_api.dll");
                     break;
                 case RuntimeType.Auto:
