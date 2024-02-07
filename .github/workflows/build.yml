@@ -23,3 +23,11 @@ jobs:
         name: chihuahua
         path: ${{github.workspace}}/bin/Release/net8.0/win-x64/publish/*.*
         if-no-files-found: error
+    - name: Compress artifacts
+      if: startsWith(github.ref, 'refs/tags/')
+      run: 7z a ${{github.workspace}}/chihuahua.zip ${{github.workspace}}/bin/Release/net8.0/win-x64/publish/*.*
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: chihuahua.zip
