@@ -1,5 +1,5 @@
 ﻿using GitHub;
-using GitHub.Client;
+using GitHub.Octokit.Client;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
