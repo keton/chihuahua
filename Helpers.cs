@@ -420,6 +420,27 @@ namespace chihuahua {
                     || uePathSuffixes.Any(elem => (Path.GetDirectoryName(gameExe) ?? "").EndsWith(elem));
         }
 
+        // Fallback for atypical games like Ace Combat 7 - there's only 1 .exe in root game folder
+        public static string? TryFindMainExecutableFallback(string gameExe) {
+
+            Logger.Warn($"Last resort trying to find correct game executable for [dim]{Path.GetFileName(gameExe)}[/]");
+
+            // all folders from list must be present
+            var mandatoryFolders = ImmutableArray.Create(
+                                    ("Engine\\Binaries\\ThirdParty", SearchOption.TopDirectoryOnly),
+                                    ("Content", SearchOption.AllDirectories)
+            );
+
+            foreach (var (folderPattern, searchOption) in mandatoryFolders) {
+                var res = Directory.GetDirectories(Path.GetDirectoryName(gameExe) ?? "", folderPattern, searchOption);
+                if (res.Length == 0) {
+                    return null;
+                }
+            }
+
+            return gameExe;
+        }
+
         public static string? TryFindMainExecutable(string gameExe) {
             if (IsUnrealExecutable(gameExe)) return gameExe;
 
@@ -440,7 +461,7 @@ namespace chihuahua {
                 return Path.Join(Path.GetDirectoryName(gameExe), result.Files.First().Path.Replace('/', '\\'));
             }
 
-            return null;
+            return TryFindMainExecutableFallback(gameExe);
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
