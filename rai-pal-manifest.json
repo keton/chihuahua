@@ -1,10 +1,13 @@
 {
-  "version": "0.1",
+  "title": "Chihuahua",
+  "version": "0.1.0",
   "runnable": {
     "path": "chihuahua.exe",
     "args": [
       "{{ExecutablePath}}",
-      "--delay", "30"
+      "--delay", "20",
+      "--launch-cmd", "{{StartCommand}}",
+      "--launch-args", "{{StartCommandArgs}}"
     ]
   },
   "engine": "Unreal",
